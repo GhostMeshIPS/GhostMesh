@@ -145,9 +145,9 @@ python tools/chat_client.py --port /dev/ttyUSB0   # TBD
 | Role | Focus | Member |
 |---|---|---|
 | Comp E | Node firmware & hardware | Yunus Hassen |
-| Network #1 | Routing & reliability, simulator | _TBD_ |
-| Network #2 | Secure transport, traffic analysis, red team | _TBD_ |
-| AI/ML | Intrusion prevention system | _TBD_ |
+| Network #1 | Routing & reliability, simulator | Rashad Safir |
+| Network #2 | Secure transport, traffic analysis, red team | Jose Perez |
+| AI/ML | Intrusion prevention system | Hannan Ahmed |
 
 ## License
 
