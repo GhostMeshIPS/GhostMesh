@@ -49,7 +49,9 @@ PLAYBOOK = """\
 - A node shows SILENT: it stopped transmitting. Usually unplugged, out of range or out of battery. Messages reroute through the other nodes (e.g. A to C via D instead of B) within about 10 seconds.
 - A message did not arrive (no double tick): the sender retries automatically 3 times (after 1, 2 and 4 seconds). If it still fails, check that a path exists on the mesh map, then resend.
 - Is the network safe right now: it is safe if there are no active blocks or attacking radios in the live status.
-- Want to unblock someone early, change thresholds or retrain: not possible from this chat. That has to be done by the IPS operator in the code."""
+- Want to block or unblock a radio by hand: use the Block / Unblock button next to it in the Transmitters list. Blocks also expire on their own after 60 seconds.
+- An attack is waiting for confirmation (auto-block is off): read its evidence in the Activity feed, then click Confirm BLOCK, or Dismiss if it's a false alarm. Turn "Auto-block attackers" back on in the sidebar to let the IPS block by itself.
+- Change thresholds or retrain the models: not possible from this chat. That has to be done in the code."""
 
 SYSTEM = f"""You are the GhostMesh watchtower assistant, built into the IPS dashboard of an encrypted,
 off-grid mesh network. Answer questions about what the dashboard shows, what terms mean, and what
@@ -106,6 +108,16 @@ def live_status(windows, events, status=None):
         lines.append(f"- {display_name(r['mac'])}: {state}, {r['pkt_count']:.0f} packets/s, "
                      f"signal {r['rssi_mean']:.0f} dBm, last heard {ago:.0f} s ago.")
     lines.append(f"Active blocks: {', '.join(display_name(m) for m in active) or 'none'}.")
+    pending = {}
+    if events is not None and not events.empty:
+        for _, e in events.sort_values("wall").iterrows():
+            if e["kind"] == "PENDING":
+                pending[e["mac"]] = e["attack"]
+            elif e["kind"] in ("BLOCK", "DISMISS"):
+                pending.pop(e["mac"], None)
+    if pending:
+        lines.append("Waiting for the operator to click Confirm BLOCK or Dismiss (auto-block is off): "
+                     + ", ".join(f"{display_name(m)} ({a})" for m, a in pending.items()) + ".")
     # Pre-sorted rankings, because the model compares numbers badly (especially negative dBm)
     by_signal = latest.sort_values("rssi_mean", ascending=False)
     lines.append("Signal strength ranking, STRONGEST first: "

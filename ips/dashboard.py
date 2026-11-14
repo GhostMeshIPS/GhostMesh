@@ -6,6 +6,7 @@ Terminal 2:  python3 live.py --file test_session.jsonl --speed 5
 import html
 import json
 import os
+import time
 from datetime import datetime
 
 import pandas as pd
@@ -15,7 +16,8 @@ import streamlit as st
 from detect import BENCH_PATH
 from explain import EVIDENCE, NODE_NAMES, OLLAMA_MODEL, display_name, top_evidence
 import chat
-from live import BLOCK_SECONDS, CONFIRM_WINDOWS, EVENTS_LOG, EXPLAIN_LOG, STATUS_PATH, WINDOWS_LOG
+from live import (BLOCK_SECONDS, COMMANDS_LOG, CONFIRM_WINDOWS, EVENTS_LOG, EXPLAIN_LOG, MODE_PATH,
+                  STATUS_PATH, WINDOWS_LOG)
 
 st.set_page_config(page_title="GhostMesh IPS", page_icon="👻", layout="wide")
 
@@ -30,6 +32,7 @@ ATTACKS = {
     "routing": ("Routing abuse", "fake TTL and extra HELLOs to pull traffic through itself"),
     "replay":  ("Replay",        "re-sending old captured packets"),
     "spoof":   ("Spoofing",      "pretending to be another node"),
+    "manual":  ("Manual block",  "blocked by the operator from the dashboard"),
 }
 CLASS_COLORS = {"normal": BLUE, "flood": RED, "routing": AMBER, "replay": TEAL, "spoof": "#868CFF"}
 
@@ -90,6 +93,7 @@ st.markdown(f"""
 
   /* sidebar */
   section[data-testid="stSidebar"] {{ background:#111C44; min-width:380px; }}
+  [class*="st-key-card_pending"] {{ border:1px solid {RED}; box-shadow:0 0 24px rgba(255,91,110,.25); }}
   [class*="st-key-chatbox"] {{ background:#0B1437; border-radius:16px; border:none; }}
   [class*="st-key-sugg"] button, [class*="st-key-clear_chat"] button {{
       font-size:.72rem; padding:4px 8px; min-height:0; border-radius:12px;
@@ -129,6 +133,27 @@ def clock(wall):
 def ago(seconds):
     seconds = max(int(seconds), 0)
     return "just now" if seconds < 2 else f"{seconds} s ago" if seconds < 120 else f"{seconds // 60} min ago"
+
+
+def send_command(action, mac):
+    """Operator click -> data/operator_commands.jsonl. live.py applies it within ~1 second."""
+    os.makedirs("data", exist_ok=True)
+    with open(COMMANDS_LOG, "a") as f:
+        f.write(json.dumps({"ts": time.time(), "action": action, "mac": mac}) + "\n")
+
+
+def read_auto_block():
+    try:
+        with open(MODE_PATH) as f:
+            return bool(json.load(f).get("auto_block", True))
+    except (OSError, ValueError):
+        return True                          # default: block automatically
+
+
+def write_auto_block(value):
+    os.makedirs("data", exist_ok=True)
+    with open(MODE_PATH, "w") as f:
+        json.dump({"auto_block": value}, f)
 
 
 def read_status():
@@ -232,6 +257,16 @@ with st.sidebar:
     st.markdown('<div class="brand">👻 Ghost<span>Mesh</span></div>'
                 '<div class="card-sub">AI watchtower · intrusion prevention</div>', unsafe_allow_html=True)
 
+    # ---- IPS controls: auto-block vs. confirm-click mode
+    st.markdown('<div class="side-h">🛡️ IPS controls</div>', unsafe_allow_html=True)
+    auto = st.toggle("Auto-block attackers", value=read_auto_block(), key="auto_block",
+                     help="On: the IPS blocks confirmed attacks by itself. Off: it waits for you to click "
+                          "Confirm BLOCK (confirm-click mode).")
+    if auto != read_auto_block():
+        write_auto_block(auto)
+    st.markdown(f'<div class="tx-meta">{"The IPS blocks confirmed attacks automatically." if auto else "Confirm-click mode: you approve every BLOCK."}</div>',
+                unsafe_allow_html=True)
+
     # ---- "Ask the watchtower" chatbot (local LLM, read-only, history auto-deleted after 24 h)
     st.markdown('<div class="side-h">💬 Ask the watchtower</div>', unsafe_allow_html=True)
     history = chat.load_history()            # re-read every run: picks up deletions older than 24 h
@@ -284,6 +319,7 @@ with st.sidebar:
         st.markdown('<div class="side-h">What it looks for</div>' + "".join(
             f'<div class="legend-item"><span class="sw" style="background:{CLASS_COLORS[k]}"></span>'
             f'<b>{title}</b><small>{desc}</small></div>' for k, (title, desc) in ATTACKS.items()
+            if k in CLASS_COLORS                     # attack types only (not "manual")
         ), unsafe_allow_html=True)
         st.markdown('<div class="side-h">Privacy</div><div class="tx-meta">Metadata only: who transmits, '
                     'how often, how strongly. Message content is encrypted and never read. Traffic logs keep '
@@ -318,13 +354,18 @@ def live_view():
     head_r.markdown(f'<div style="text-align:right;padding-top:22px">{badge_html}</div>', unsafe_allow_html=True)
 
     # Blocks active right now = BLOCK events whose expiry is still in the future
-    active = set()
+    active, pending = set(), {}               # pending: mac -> attack waiting for the operator
     if not events.empty:
         for _, e in events.iterrows():
             if e["kind"] == "BLOCK":
                 active.add(e["mac"])
+                pending.pop(e["mac"], None)
             elif e["kind"] == "UNBLOCK":
                 active.discard(e["mac"])
+            elif e["kind"] == "PENDING":
+                pending[e["mac"]] = e["attack"]
+            elif e["kind"] == "DISMISS":
+                pending.pop(e["mac"], None)
 
     # ---- KPI row
     n_attacks = 0 if events.empty else int((events["kind"] == "BLOCK").sum() + (events["kind"] == "ALERT").sum())
@@ -336,6 +377,22 @@ def live_view():
     k4.markdown(kpi("⏱️", "rgba(255,181,71,.15)", "Avg. time to block", f"{ttb:.0f} s" if ttb is not None else "–"),
                 unsafe_allow_html=True)
     st.write("")
+
+    # ---- confirm-click mode: attacks waiting for the operator's decision
+    for mac, attack in pending.items():
+        with st.container(key=f"card_pending_{mac.replace(':', '')}"):
+            msg, b1, b2 = st.columns([4, 1, 1], vertical_alignment="center")
+            title = ATTACKS.get(attack, (attack,))[0]
+            msg.markdown(f'<div class="card-title">⏳ {name(mac)} looks like <span style="color:{RED}">{title}</span>'
+                         f'</div><div class="card-sub">The AI detected this while Auto-block was off, so it is waiting for your decision. '
+                         f'See the Activity feed for its evidence.</div>', unsafe_allow_html=True)
+            if b1.button("Confirm BLOCK", key=f"confirm_{mac}", type="primary", width="stretch"):
+                send_command("block", mac)
+                st.toast(f"BLOCK sent for {name(mac)}")
+            if b2.button("Dismiss", key=f"dismiss_{mac}", width="stretch"):
+                send_command("dismiss", mac)
+                st.toast(f"Alert on {name(mac)} dismissed")
+        st.write("")
 
     # ---- traffic chart: packets per second, split by what the model said
     with st.container(key="card_traffic"):
@@ -369,6 +426,60 @@ def live_view():
                           xaxis=dict(title="time", showgrid=False, tickformat="%-I:%M:%S %p"),
                           yaxis=dict(title="packets / s", gridcolor="#1F2A5C"))
         st.plotly_chart(fig, width="stretch", config={"displayModeBar": False}, key="traffic_chart")
+    st.write("")
+
+    # ---- signals: anomaly score + signal strength per radio over time
+    with st.container(key="card_signals"):
+        st.markdown('<div class="card-title">Signals</div>'
+                    '<div class="card-sub">Per radio, last 5 minutes</div>', unsafe_allow_html=True)
+        recent = windows[windows["wall"] >= wall_now - 300].copy()
+        recent["time"] = recent["wall"].map(datetime.fromtimestamp)
+        tab_score, tab_rssi = st.tabs(["Anomaly score", "Signal strength (RSSI)"])
+
+        def line_chart(col, y_title, extra=None, smooth=1):
+            fig = go.Figure()
+            for mac, g in recent.sort_values("time").groupby("mac"):
+                # Radios the AI ever flagged are drawn bold; normal ones faded, so attacks stand out
+                flagged = (g["pred"] != "normal").any()
+                y = g[col].rolling(smooth, min_periods=1).mean()     # smooth=5 -> 5-second average
+                # Break the line where the radio went quiet (> 3 s), instead of joining the dots across the gap
+                x = g["time"].tolist()
+                y = y.tolist()
+                gaps = [i for i in range(1, len(x)) if (x[i] - x[i - 1]).total_seconds() > 3]
+                for i in reversed(gaps):
+                    x.insert(i, x[i - 1])
+                    y.insert(i, None)
+                fig.add_scatter(x=x, y=y, mode="lines", name=name(mac), connectgaps=False,
+                                line=dict(width=3 if flagged else 1.5), opacity=1 if flagged else 0.55,
+                                hovertemplate=f"{name(mac)}: %{{y:.2f}} at %{{x|%-I:%M:%S %p}}<extra></extra>")
+            if extra:
+                extra(fig)
+            fig.update_layout(height=260, margin=dict(l=0, r=0, t=10, b=0), plot_bgcolor="#111C44",
+                              paper_bgcolor="#111C44", font=dict(color=INK),
+                              legend=dict(orientation="h", y=1.15, x=1, xanchor="right"),
+                              xaxis=dict(showgrid=False, tickformat="%-I:%M:%S %p"),
+                              yaxis=dict(title=y_title, gridcolor="#1F2A5C"))
+            return fig
+
+        with tab_score:
+            if "anomaly" in recent and recent["anomaly"].notna().any():
+                def threshold(fig):
+                    fig.add_hline(y=0, line=dict(color=RED, dash="dash", width=1),
+                                  annotation_text="alarm threshold", annotation_font=dict(color=RED, size=11))
+                st.plotly_chart(line_chart("anomaly", "how unusual (higher = stranger)", threshold, smooth=5),
+                                width="stretch", config={"displayModeBar": False}, key="anomaly_chart")
+                st.markdown('<div class="tx-meta">From the Isolation Forest, which only ever saw normal traffic (5-second average). '
+                            'Above the dashed line = unlike anything it learned as normal.</div>',
+                            unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="tx-meta">No anomaly scores yet: run <code>python3 detect.py</code> '
+                            'to train the Isolation Forest.</div>', unsafe_allow_html=True)
+        with tab_rssi:
+            st.plotly_chart(line_chart("rssi_mean", "signal (dBm, closer to 0 = stronger)"),
+                            width="stretch", config={"displayModeBar": False}, key="rssi_chart")
+            st.markdown('<div class="tx-meta">Each board has its own steady level, set by its distance to the '
+                        'watchtower. One identity suddenly showing a different level is the sign of spoofing.'
+                        '</div>', unsafe_allow_html=True)
     st.write("")
 
     latest = windows.sort_values("t").groupby("mac").tail(1).sort_values("mac")   # newest window per radio
@@ -424,15 +535,22 @@ def live_view():
     with left, st.container(key="card_tx"):
         st.markdown('<div class="card-title">Transmitters</div>'
                     '<div class="card-sub">Every radio the watchtower can hear</div>', unsafe_allow_html=True)
-        rows = []
         for _, r in latest.iterrows():
             label, _, css = status(r, active, now)
             pill = f'<span class="pill {css}">{label}</span>'
             seen = ago(now - r["t"])
-            rows.append(f'<div class="tx"><div><div class="tx-name">{name(r["mac"])} &nbsp;{pill}</div>'
-                        f'<div class="tx-meta">{r["mac"]} · signal {r["rssi_mean"]:.0f} dBm · seen {seen}</div></div>'
-                        f'<div class="tx-rate">{r["pkt_count"]:.0f}<div class="tx-meta">pkts/s</div></div></div>')
-        st.markdown("".join(rows), unsafe_allow_html=True)
+            info, btn = st.columns([3.3, 1], vertical_alignment="center")
+            info.markdown(f'<div class="tx"><div><div class="tx-name">{name(r["mac"])} &nbsp;{pill}</div>'
+                          f'<div class="tx-meta">{r["mac"]} · {r["pkt_count"]:.0f} pkts/s · '
+                          f'{r["rssi_mean"]:.0f} dBm · seen {seen}</div></div></div>', unsafe_allow_html=True)
+            # Manual override: the operator can always block or lift a block by hand
+            if r["mac"] in active:
+                if btn.button("Unblock", key=f"unblock_{r['mac']}", width="stretch"):
+                    send_command("unblock", r["mac"])
+                    st.toast(f"Unblocking {name(r['mac'])}")
+            elif btn.button("Block", key=f"block_{r['mac']}", width="stretch"):
+                send_command("block", r["mac"])
+                st.toast(f"BLOCK sent for {name(r['mac'])}")
 
     # ---- traffic mix donut
     with mid, st.container(key="card_mix"):
@@ -495,11 +613,22 @@ def live_view():
                 when = f"{clock(e['wall'])} ({ago(wall_now - e['wall'])})"
                 if e["kind"] == "BLOCK":
                     title, why = ATTACKS.get(e["attack"], (e["attack"], ""))
-                    items.append(("🚫", "rgba(255,91,110,.15)", f"Blocked {name(e['mac'])}: {title}",
+                    by_you = " (by you)" if "operator" in str(e["note"]) and e["attack"] != "manual" else ""
+                    items.append(("🚫", "rgba(255,91,110,.15)", f"Blocked {name(e['mac'])}: {title}{by_you}",
                                   f"{when} · {why}. BLOCK sent to watchtower for {BLOCK_SECONDS} s." + why_html(e)))
+                elif e["kind"] == "UNBLOCK" and "operator" in str(e["note"]):
+                    items.append(("🔓", "#1F2A5C", f"{name(e['mac'])} unblocked by you", f"{when} · manual override"))
                 elif e["kind"] == "UNBLOCK":
                     items.append(("🔓", "#1F2A5C", f"Block on {name(e['mac'])} expired",
                                   f"{when} · blocks are temporary, so a wrongly blocked node is never cut off for good"))
+                elif e["kind"] == "PENDING":
+                    title, why = ATTACKS.get(e["attack"], (e["attack"], ""))
+                    items.append(("⏳", "rgba(255,181,71,.15)", f"Waiting for you: {name(e['mac'])}, {title}",
+                                  f"{when} · {why}. Auto-block is off, so the IPS asked before blocking."
+                                  + why_html(e)))
+                elif e["kind"] == "DISMISS":
+                    items.append(("✋", "#1F2A5C", f"You dismissed the alert on {name(e['mac'])}",
+                                  f"{when} · no BLOCK sent; the IPS won't ask again until this attack stops"))
                 else:
                     title, why = ATTACKS.get(e["attack"], (e["attack"], ""))
                     items.append(("⚠️", "rgba(255,181,71,.15)", f"Alert: {name(e['mac'])}, {title}",

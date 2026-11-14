@@ -75,6 +75,11 @@ def make_block_cmd(mac, pseudo, reason, until):
             "reason": reason, "until": round(until, 3)}
 
 
+def make_unblock_cmd(mac):
+    """Lift a block early (operator clicked Unblock). Blocks also expire on their own via `until`."""
+    return {"cmd": "unblock", "mac": mac}
+
+
 def encode_cmd(cmd):
     """Dict -> one line of bytes, ready to write to the serial port."""
     return (json.dumps(cmd) + "\n").encode("utf-8")

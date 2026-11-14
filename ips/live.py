@@ -23,7 +23,7 @@ from explain import EVIDENCE, explain
 from features import WINDOW, build_features
 from ingest import open_serial, replay, read_file, serial_stream
 from retention import WINDOWS_MAX_AGE_S, prune_jsonl
-from schema import encode_cmd, make_block_cmd
+from schema import encode_cmd, make_block_cmd, make_unblock_cmd
 
 BUFFER_SECONDS = 10   # recent history kept in memory (needed for gaps across windows)
 CONFIRM_WINDOWS = 2   # attack must be seen in this many windows in a row before acting
@@ -36,6 +36,8 @@ WINDOWS_LOG = "data/live_windows.jsonl"
 EVENTS_LOG = "data/live_events.jsonl"
 EXPLAIN_LOG = "data/live_explanations.jsonl"   # LLM summaries, written a few seconds after each event
 STATUS_PATH = "data/live_status.json"          # replay or watchtower, speed, start time (for the dashboard)
+COMMANDS_LOG = "data/operator_commands.jsonl"  # Block / Unblock / Confirm / Dismiss clicks from the dashboard
+MODE_PATH = "data/ips_mode.json"               # {"auto_block": true/false}, set by the dashboard switch
 PRUNE_EVERY_S = 600                            # check the 6-hour log limit every 10 minutes
 
 
@@ -50,6 +52,9 @@ class LiveIPS:
         self.streak_rows = defaultdict(list)  # mac -> the windows in the current streak (the evidence)
         self.last_attack_w = {}               # mac -> last window it was flagged in
         self.blocks = {}                      # mac -> time the block expires
+        self.pending = {}                     # mac -> (attack, evidence) waiting for the operator (confirm mode)
+        self.dismissed = set()                # macs whose current attack the operator chose to ignore
+        self.cmd_offset = 0                   # how far into COMMANDS_LOG we've read
         self.recent_normal = deque(maxlen=300)   # recent normal windows: "what normal looks like"
         self.offset = 0.0                     # real clock time minus packet time (t), from rx_t
         self.last_prune = 0.0
@@ -76,6 +81,7 @@ class LiveIPS:
             self.buffer.pop(0)
 
     def close_window(self, w, now):
+        self.process_commands(now)            # operator clicks from the dashboard (at most ~1 s old)
         self.expire_blocks(now)
         wall_now = now + self.offset
         if wall_now - self.last_prune > PRUNE_EVERY_S:  # keep only the last 6 hours of windows
@@ -91,12 +97,17 @@ class LiveIPS:
         # What the other two detectors would have said (logged for comparison, they don't act)
         rule_says = rule_detect(rows).tolist()
         if_says = iforest_detect(self.iforest, rows).tolist() if self.iforest else [None] * len(rows)
+        # Anomaly score: how unusual each window looks to the Isolation Forest.
+        # Flipped so that HIGHER = MORE unusual; above 0 = past the model's alarm threshold.
+        anomaly = ((-self.iforest.decision_function(rows[FEATURES])).round(3).tolist()
+                   if self.iforest else [None] * len(rows))
 
-        for (_, row), pred, conf, by_rule, by_if in zip(rows.iterrows(), preds, confs, rule_says, if_says):
+        for (_, row), pred, conf, by_rule, by_if, score in zip(rows.iterrows(), preds, confs,
+                                                                rule_says, if_says, anomaly):
             mac = row["mac"]
             record = {"t": w * WINDOW, "wall": round(w * WINDOW + self.offset, 3),
                       "mac": mac, "pred": pred, "conf": round(float(conf), 3),
-                      "rule": by_rule, "iforest": by_if,
+                      "rule": by_rule, "iforest": by_if, "anomaly": score,
                       "label": row.get("label"),               # ground truth, only in synthetic data
                       **{f: float(row[f]) for f in FEATURES}}
             log_line(WINDOWS_LOG, record)
@@ -104,6 +115,7 @@ class LiveIPS:
             if pred == "normal":
                 self.streak[mac] = 0
                 self.streak_rows[mac] = []
+                self.dismissed.discard(mac)            # a dismissed attack that ended: watch it fresh again
                 self.recent_normal.append(record)
                 continue
             # Count only CONSECUTIVE attack windows: a gap (node went quiet) restarts the count
@@ -112,6 +124,7 @@ class LiveIPS:
             else:
                 self.streak[mac] = 1
                 self.streak_rows[mac] = []
+                self.dismissed.discard(mac)
             self.last_attack_w[mac] = w
             self.streak_rows[mac].append(record)
 
@@ -134,13 +147,50 @@ class LiveIPS:
             if first:
                 self.event(now, "ALERT", mac, attack, "alert only (blocking would cut off the victim)",
                            self.evidence(mac))
-        elif attack in BLOCK_ATTACKS and mac not in self.blocks:
-            # new attack, or still attacking after an old block expired -> (re)block
-            pseudo = next((p["pseudo"] for p in reversed(self.buffer) if p["mac"] == mac), "")
-            until = now + BLOCK_SECONDS
-            self.blocks[mac] = until
-            self.send_cmd(make_block_cmd(mac, pseudo, attack, until))
-            self.event(now, "BLOCK", mac, attack, f"blocked for {BLOCK_SECONDS}s", self.evidence(mac))
+        elif attack in BLOCK_ATTACKS and mac not in self.blocks and mac not in self.dismissed:
+            # new attack, or still attacking after an old block expired
+            if auto_block_enabled():
+                self.block(mac, attack, now, self.evidence(mac), f"blocked for {BLOCK_SECONDS}s")
+            elif mac not in self.pending:
+                # Confirm-click mode: ask the operator instead of blocking on our own
+                ev = self.evidence(mac)
+                self.pending[mac] = (attack, ev)
+                self.event(now, "PENDING", mac, attack, "waiting for the operator to confirm the BLOCK", ev)
+
+    def block(self, mac, attack, now, evidence, note):
+        """Send a BLOCK to the watchtower (which signs and broadcasts it) and record it."""
+        pseudo = next((p["pseudo"] for p in reversed(self.buffer) if p["mac"] == mac), "")
+        until = now + BLOCK_SECONDS
+        self.blocks[mac] = until
+        self.pending.pop(mac, None)
+        self.send_cmd(make_block_cmd(mac, pseudo, attack, until))
+        self.event(now, "BLOCK", mac, attack, note, evidence)
+
+    def process_commands(self, now):
+        """Apply new operator clicks (written by the dashboard) since we last looked."""
+        if not os.path.exists(COMMANDS_LOG):
+            return
+        with open(COMMANDS_LOG) as f:
+            f.seek(self.cmd_offset)
+            lines = f.readlines()
+            self.cmd_offset = f.tell()
+        for line in lines:
+            try:
+                cmd = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            mac, action = cmd.get("mac"), cmd.get("action")
+            if action == "block" and mac not in self.blocks:
+                attack, ev = self.pending.get(mac, ("manual", None))   # confirming a pending alert, or a manual block
+                self.block(mac, attack, now, ev, f"blocked by the operator for {BLOCK_SECONDS}s")
+            elif action == "unblock" and mac in self.blocks:
+                del self.blocks[mac]
+                self.send_cmd(make_unblock_cmd(mac))
+                self.event(now, "UNBLOCK", mac, "", "unblocked by the operator")
+            elif action == "dismiss" and mac in self.pending:
+                attack, _ = self.pending.pop(mac)
+                self.dismissed.add(mac)                # don't ask again until this attack stops
+                self.event(now, "DISMISS", mac, attack, "operator dismissed the alert")
 
     def expire_blocks(self, now):
         for mac, until in list(self.blocks.items()):
@@ -174,6 +224,15 @@ class LiveIPS:
         log_line(EXPLAIN_LOG, {"event_t": event["t"], "mac": event["mac"], "text": text, "source": source})
 
 
+def auto_block_enabled():
+    """The dashboard's Auto-block switch. Missing/unreadable file = auto (the safe default for a demo)."""
+    try:
+        with open(MODE_PATH) as f:
+            return bool(json.load(f).get("auto_block", True))
+    except (OSError, ValueError):
+        return True
+
+
 def log_line(path, obj):
     """Append one JSON line to a log file (the dashboard reads these)."""
     with open(path, "a") as f:
@@ -202,7 +261,7 @@ def main():
 
     # Start each run with empty logs so the dashboard shows only this run
     os.makedirs("data", exist_ok=True)
-    for path in (WINDOWS_LOG, EVENTS_LOG, EXPLAIN_LOG):
+    for path in (WINDOWS_LOG, EVENTS_LOG, EXPLAIN_LOG, COMMANDS_LOG):
         open(path, "w").close()
 
     # Tell the dashboard where the data comes from (shown as LIVE or "5x replay")
