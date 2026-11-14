@@ -1,0 +1,11 @@
+# Dashboard look: dark navy theme in GhostMesh blue
+[theme]
+base = "dark"
+primaryColor = "#3B5BFD"
+backgroundColor = "#0B1437"
+secondaryBackgroundColor = "#111C44"
+textColor = "#E9EDF7"
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"

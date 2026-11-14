@@ -1,0 +1,167 @@
+import json
+import os
+import joblib                         # saves/loads trained models to disk
+import pandas as pd
+from sklearn.ensemble import IsolationForest, RandomForestClassifier
+from sklearn.metrics import classification_report
+from features import build_features   # reuse the Step 3 feature builder
+
+# Baseline detector: a fixed threshold picked by looking at the data.
+# Normal nodes send ~1 packet per window, the flood ~30, so 15 sits safely between.
+RATE_THRESHOLD = 15  # packets per window
+
+# Columns the ML models learn from: behaviour only. Left out on purpose:
+#   mac, window -> identifiers, not behaviour (the model would memorise who/when)
+#   label       -> the answer; using it would be cheating
+#   pred_*      -> other detectors' outputs
+FEATURES = ["pkt_count", "hello_count", "rssi_mean", "rssi_std",
+            "ttl_max", "hop_min", "gap_mean", "link_fail"]
+
+RF_PATH = "models/rf.joblib"            # where the trained Random Forest is saved for live.py
+IF_PATH = "models/iforest.joblib"       # trained Isolation Forest (for the rule-vs-AI comparison)
+BENCH_PATH = "models/benchmark.json"    # test-session scores of all 3 detectors (for the dashboard)
+
+
+def rule_detect(feats):
+    """Flag every window whose packet count is above the threshold.
+
+    Vectorized: compares the whole pkt_count column at once and returns a
+    True/False Series (one value per window). No if/else needed, because the
+    comparison itself already produces True/False.
+    """
+    return feats["pkt_count"] > RATE_THRESHOLD
+
+
+def evaluate(y_true, y_pred):
+    """y_true: True/False 'is it really an attack'; y_pred: True/False 'did we flag it'."""
+    # The four crosstab cells (& = AND, ~ = NOT, .sum() counts the Trues)
+    tp = (y_true & y_pred).sum()         # attack AND flagged      -> caught
+    fp = ((~y_true) & y_pred).sum()      # normal AND flagged      -> false alarm
+    fn = (y_true & (~y_pred)).sum()      # attack AND not flagged  -> missed
+    tn = ((~y_true) & (~y_pred)).sum()   # normal AND not flagged  -> correctly ignored
+
+    # Precision: when we raise an alarm, how often is it a real attack?
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    # Recall: of all real attacks, how many did we catch?
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    # False-positive rate: of all normal windows, how many did we wrongly flag?
+    fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
+    # (the "if ... else 0.0" guards against dividing by zero, e.g. a detector that flags nothing)
+
+    return {"precision": precision, "recall": recall, "fpr": fpr,
+            "tp": int(tp), "fp": int(fp), "fn": int(fn), "tn": int(tn)}
+
+
+def print_scores(name, scores):
+    """Print one detector's scores on a single line."""
+    print(f"{name:<8} precision {scores['precision']:.3f}   "
+          f"recall {scores['recall']:.3f}   fpr {scores['fpr']:.3f}")
+
+
+def train_iforest(train_feats):
+    """Learn what 'normal' looks like from clean (attack-free) windows. No labels used."""
+    model = IsolationForest(
+        n_estimators=100,     # number of random trees in the forest
+        contamination=0.01,   # expect ~1% of windows to look odd -> sets the alarm threshold
+        random_state=42,      # same random cuts every run (like random.seed)
+    )
+    model.fit(train_feats[FEATURES])   # fit = train
+    return model
+
+
+def iforest_detect(model, feats):
+    """Flag windows the model thinks don't fit 'normal'."""
+    raw = model.predict(feats[FEATURES])   # sklearn's convention: 1 = normal, -1 = anomaly
+    # Convert to True/False and keep the same row index as feats so it lines up
+    return pd.Series(raw == -1, index=feats.index)
+
+
+def train_rf(train_feats):
+    """Supervised: learn to NAME the attack from labeled windows."""
+    model = RandomForestClassifier(
+        n_estimators=100,     # 100 decision trees that vote
+        random_state=42,      # reproducible results
+    )
+    # Unlike the Isolation Forest, we pass the answers (labels) in as well
+    model.fit(train_feats[FEATURES], train_feats["label"])
+    return model
+
+
+def rf_detect(model, feats):
+    """Predicted class for each window: 'normal', 'flood' or 'routing'."""
+    return pd.Series(model.predict(feats[FEATURES]), index=feats.index)
+
+
+def flagged_table(feats, pred_col, who):
+    """Truth vs. prediction: rows = real label, columns = what the detector said.
+      flood/flagged  = attacks caught       flood/ignored  = attacks missed
+      normal/ignored = correctly ignored    normal/flagged = false alarms
+    """
+    return pd.crosstab(
+        feats["label"],
+        feats[pred_col].map({True: "flagged", False: "ignored"}),  # True/False -> readable words
+        rownames=["actual"],
+        colnames=[f"{who} said"],
+    )
+
+
+if __name__ == "__main__":
+    # --- Train the Isolation Forest ONCE, on clean normal traffic only ---
+    # Training doesn't depend on which attack file we test, so it stays outside the loop.
+    train_feats = build_features(pd.read_json("normal_session1.jsonl", lines=True))
+    model = train_iforest(train_feats)
+
+    # --- Test both detectors on each attack session (data the model has never seen) ---
+    for path in ["flood_session1.jsonl", "slowflood_session1.jsonl"]:
+        feats = build_features(pd.read_json(path, lines=True))   # packets -> windows
+        y_true = feats["label"] != "normal"                      # True = real attack window
+
+        feats["pred_rule"] = rule_detect(feats)                  # threshold baseline
+        feats["pred_iforest"] = iforest_detect(model, feats)     # ML anomaly detector
+
+        print(f"\n=== {path} ===")
+        flood = feats[feats["label"] == "flood"]
+        print(f"flood windows: {len(flood)}   avg pkt_count: {flood['pkt_count'].mean():.1f}")
+        print_scores("rule", evaluate(y_true, feats["pred_rule"]))
+        print_scores("iforest", evaluate(y_true, feats["pred_iforest"]))
+        print(flagged_table(feats, "pred_rule", "rule"))
+        print(flagged_table(feats, "pred_iforest", "iforest"))
+
+    # --- Step 9: Random Forest — train on one session, test on a DIFFERENT one ---
+    train = build_features(pd.read_json("train_session.jsonl", lines=True))
+    test = build_features(pd.read_json("test_session.jsonl", lines=True))
+    rf = train_rf(train)
+    test["pred_rf"] = rf_detect(rf, test)
+
+    print("\n=== Random Forest: trained on train_session, tested on test_session ===")
+    # Precision/recall for EACH class, not just attack vs. normal
+    print(classification_report(test["label"], test["pred_rf"], digits=3))
+
+    # Confusion table: rows = truth, columns = what the RF said
+    print(pd.crosstab(test["label"], test["pred_rf"], rownames=["actual"], colnames=["rf said"]))
+
+    # How much each feature helped the trees decide (sums to 1.0)
+    print("\nfeature importance:")
+    importance = pd.Series(rf.feature_importances_, index=FEATURES).sort_values(ascending=False)
+    print(importance.round(3).to_string())
+
+    # Save the trained models so live.py can load them instead of retraining every start
+    os.makedirs("models", exist_ok=True)
+    joblib.dump(rf, RF_PATH)
+    joblib.dump(model, IF_PATH)
+    print(f"\nsaved Random Forest -> {RF_PATH}, Isolation Forest -> {IF_PATH}")
+
+    # --- Benchmark: all 3 detectors on the SAME unseen test session (slow flood + routing) ---
+    # Attack vs. normal for every detector, so the numbers are directly comparable.
+    y_test = test["label"] != "normal"
+    bench = {
+        "Rule (pkt_count > 15)": evaluate(y_test, rule_detect(test)),
+        "Isolation Forest": evaluate(y_test, iforest_detect(model, test)),
+        "Random Forest": evaluate(y_test, test["pred_rf"] != "normal"),
+    }
+    print("\n=== Benchmark on test_session (slow flood + routing abuse) ===")
+    for who, s in bench.items():
+        print_scores(who[:8], s)
+    with open(BENCH_PATH, "w") as f:
+        json.dump(bench, f, indent=2)
+    print(f"saved benchmark -> {BENCH_PATH}")

@@ -29,6 +29,12 @@ env/
 sim/logs/
 sim/out/
 ips/data/raw/
+# IPS live logs + chatbot history (private, auto-deleted, regenerated each run)
+ips/data/
+# IPS trained models: rebuild with `python3 detect.py`
+ips/models/
+# IPS synthetic sessions: rebuild with `python3 synth.py` (fixed seeds)
+ips/*.jsonl
 *.pcap
 *.pcapng
 .streamlit/secrets.toml
