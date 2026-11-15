@@ -49,7 +49,9 @@ flowchart TD
     NOTE[/"Own frames cached<br>at send time"/] -.- SC
 
     SC -->|Yes| PR{"Pending relay<br>for msg_id?"}
-    PR -->|Yes| CPR["Cancel relay,<br>log duplicate"]
+    PR -->|"Yes: count++"| KC{"count >= k?"}
+    KC -->|Yes| CPR["Cancel relay,<br>log duplicate"]
+    KC -->|No| KEEP["Log duplicate,<br>keep relay pending"]
     PR -->|No| LD["Log duplicate,<br>drop"]
 
     SC -->|"No: add to cache"| CMD{"Decrypts?"}
@@ -63,7 +65,7 @@ flowchart TD
     TTL -->|No| REL["ttl--, hop_count++<br>src_pseudo = mine, next_hop = 0<br>recompute link_tag<br>rebroadcast after RSSI jitter"]
 ```
 
-When a frame arrives, the node first checks the `link_tag`. If it doesn't match, the frame came from outside the network, so it's logged and dropped. Then, the node checks the `msg_id` against its own seen cache. If it is a repeated ID, then it's logged as a duplicate and dropped, and if the node was waiting to relay that same frame, hearing a neighbor send it cancels the pending relay. The node would also cache the `msg_id` of every frame it sends itself, so that its own frames can't loop back and be relayed. A new `msg_id` is added to the cache, and the node tries to decrypt the frame. 
+When a frame arrives, the node first checks the `link_tag`. If it doesn't match, the frame came from outside the network, so it's logged and dropped. Then, the node checks the `msg_id` against its own seen cache. If it is a repeated ID, then it's logged as a duplicate and dropped, and if the node was waiting to relay that same frame, the duplicate counts towards k; once the count reaches k, the pending relay would be cancelled (see Section 5.3). The node would also cache the `msg_id` of every frame it sends itself, so that its own frames can't loop back and be relayed. A new `msg_id` is added to the cache, and the node tries to decrypt the frame. 
 
 If decryption works, the frame is meant for that node. An ACK would mark the node's sent message as delivered and wouldn't get a reply. A DATA frame is delivered to the laptop over serial, and an ACK would be sent back to the sender. Regardless of whether or not the frame was meant for this node, it goes to the TTL check next. At `ttl == 0` the node doesn't relay it and logs `ttl_expired`. Otherwise the node decrements `ttl`, increments `hop_count`, sets its own pseudonym in `src_pseudo`, sets `next_hop` to 0, and then recomputes `link_tag`. Finally, it rebroadcasts after a random wait (depending on the RSSI).
 
@@ -74,8 +76,11 @@ If decryption works, the frame is meant for that node. An ACK would mark the nod
 
 ### 5.3 Relay timing
 
-- Jitter window and how RSSI sets the wait
-- Rebroadcast suppression
+**Jitter:** Before rebroadcasting, a relay would wait a random time within the jitter window (where a weaker RSSI would mean a shorter wait, so farther nodes would relay first). _Exact RSSI-to-wait mapping: TBD._
+
+**Rebroadcast suppression:** While a relay is pending, the node would count copies of the same `msg_id` that it hears from other nodes. The copy that started the timer wouldn't count though. If the count reaches a value of **k**, the node would cancel its relay. Otherwise it rebroadcasts when the timer hits. (This is inspired by [RFC 6206](https://www.rfc-editor.org/rfc/rfc6206))
+
+**Timing rule:** The jitter window must be at least 2-3x the airtime of k frames, so that a node has time to hear k copies before the timer hits. This is inspired by [RFC 6206 Section 6.6](https://www.rfc-editor.org/rfc/rfc6206#section-6.6), where Trickle sets it up as the protocol having the minimum interval be at least 2-3 times as long as it takes to transmit k packets. 
 
 ### 5.4 Drop reasons
 
@@ -143,7 +148,9 @@ _Owner: Rashad + Jose_
 | Default TTL (sim) | TBD | |
 | Seen-cache size | TBD | |
 | Seen-cache expiry | TBD | |
-| Relay jitter window | TBD | |
+| Relay jitter window | TBD | Planned 10–50 ms. Must be at least 2–3× the airtime of k frames |
+| Suppression threshold k | TBD | Proposed 2–3; settle by sim sweep |
+| Frame airtime | TBD | Estimated ~3 ms per 240-byte frame at 1 Mbps; measure on hardware later |
 | HELLO interval | TBD | |
 | Neighbor expiry | TBD | |
 | ACK timeout / retries / backoff | TBD | |
