@@ -103,7 +103,7 @@ Use the RSSI gate + low TX power by default. Keep the allowlist as the "demo mus
 
 | Field | Bytes | Visible to relays? | Purpose |
 |---|---|---|---|
-| `ver_type` | 1 | Yes | Version + type: DATA, ACK, HELLO, RREQ, RREP, BLOCK |
+| `ver_type` | 1 | Yes | Version + type: DATA, ACK, HELLO, BLOCK |
 | `flags` | 1 | Yes | e.g., SOS priority, needs-ACK |
 | `msg_id` | 8 | Yes | **Random** ID (not a counter) used for duplicate suppression |
 | `ttl` | 1 | Yes | Remaining hops; drop at 0 |
@@ -182,6 +182,7 @@ Use the RSSI gate + low TX power by default. Keep the allowlist as the "demo mus
 | Date | Decision | Owner | Status |
 |---|---|---|---|
 | Nov 14 | **Relays rewrite `src_pseudo` with their own pseudonym before rebroadcasting.** The field means "who just transmitted this," not "who originated it." Zero extra bytes. Why: §4.3 route learning needs to know which neighbor handed over a frame, and nothing else in §4.1 carries that (MACs rotate every 60 s); a cleartext originator pseudonym leaked the flood's source to passive observers; and the IPS's RSSI-per-identity feature saw every relayed frame as a spoof. Impact: firmware rewrites the field and recomputes `link_tag` per hop (Comp E); Network #2 defines the per-hop `link_tag`; watchtower `pseudo` = transmitter (AI/ML). Write-up: https://claude.ai/artifact/QZENs6ZDvkPTan5YicPo8Q | Network #1 | Decided. Open: directed forwarding past two hops (Network #1) |
+| Nov 14 | **RREQ and RREP dropped from `ver_type`.** Route discovery comes from the first data flood (relays note which neighbor each frame came from) and the ACK retracing that path; no separate discovery frames. A standard RREQ would also put the destination in cleartext. May return later as a sim-only scaling experiment if time allows. | Network #1 | Decided |
 
 ---
 
