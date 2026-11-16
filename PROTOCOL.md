@@ -55,8 +55,11 @@ flowchart TD
     PR -->|No| LD["Log duplicate,<br>drop"]
 
     SC -->|"No: add to cache"| CMD{"Decrypts?"}
-    CMD -->|"Yes, ACK"| MNR["Mark delivered,<br>no reply"]
-    CMD -->|"Yes, DATA"| DSA["Deliver to serial,<br>send ACK"]
+    CMD -->|"Yes, ACK"| MNR["Match to 'waiting for ACK'<br>(any attempt's msg_id),<br>stop retry timer,<br>tell laptop delivered,<br>no reply"]    
+    CMD -->|"Yes, DATA"| SEQ{"Seq # already seen<br>from this sender?"}
+    SEQ -->|No| DSA["Deliver to serial,<br>send ACK"]
+    SEQ -->|Yes| REACK["Send ACK again,<br>don't deliver"]
+    REACK --> TTL    
     CMD -->|No| TTL{"ttl == 0?"}
     MNR --> TTL
     DSA --> TTL
@@ -67,12 +70,52 @@ flowchart TD
 
 When a frame arrives, the node first checks the `link_tag`. If it doesn't match, the frame came from outside the network, so it's logged and dropped. Then, the node checks the `msg_id` against its own seen cache. If it is a repeated ID, then it's logged as a duplicate and dropped, and if the node was waiting to relay that same frame, the duplicate counts towards k; once the count reaches k, the pending relay would be cancelled (see Section 5.3). The node would also cache the `msg_id` of every frame it sends itself, so that its own frames can't loop back and be relayed. A new `msg_id` is added to the cache, and the node tries to decrypt the frame. 
 
-If decryption works, the frame is meant for that node. An ACK would mark the node's sent message as delivered and wouldn't get a reply. A DATA frame is delivered to the laptop over serial, and an ACK would be sent back to the sender. Regardless of whether or not the frame was meant for this node, it goes to the TTL check next. At `ttl == 0` the node doesn't relay it and logs `ttl_expired`. Otherwise the node decrements `ttl`, increments `hop_count`, sets its own pseudonym in `src_pseudo`, sets `next_hop` to 0, and then recomputes `link_tag`. Finally, it rebroadcasts after a random wait (depending on the RSSI).
+If decryption works, the frame is meant for that node. An ACK is matched to the node's "waiting for ACK" entry by any of its attempt `msg_id`s, which stops the retry timer and tells the laptop the message was delivered, with no reply. A second ACK for the same message finds no entry and is ignored. For a DATA frame, the node checks the sequence number. If it's new, the message gets delivered to the laptop and an ACK is sent back. If its been seen, the first ACK got lost, so the node only resends the ACK. Regardless of whether or not the frame was meant for this node, it goes to the TTL check next. At `ttl == 0` the node doesn't relay it and logs `ttl_expired`. Otherwise the node decrements `ttl`, increments `hop_count`, sets its own pseudonym in `src_pseudo`, sets `next_hop` to 0, and then recomputes `link_tag`. Finally, it rebroadcasts after a random wait (depending on the RSSI).
 
 ### 5.2 Send rules
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 30, "rankSpacing": 35}}}%%
+flowchart TD
+    T1([Laptop sends cmd]) --> LEN{"Is length<br>> 153 bytes?"}
+    T2([Receive path needs ACK]) --> NEW_MSG
+    T3([Retry timer fired]) --> RETRY{"Retries left?"}
 
-- Building a new frame
-- Caching your own `msg_id` before transmitting
+    RETRY --> |No| FAIL["Tell the laptop that message failed.<br>Clear the 'waiting for ACK'"]
+    RETRY --> |Yes| NEW_MSG
+
+    LEN --> |Yes| ER["Send error back to laptop<br>and stop."]
+    LEN --> |No| NEW_MSG["Make a new random msg_id"]
+
+    NEW_MSG --> BHD["Build the inner header:<br>real sender, recipient, timestamp,<br>sequence number (next one for new message,<br>original one for retry), & message length.<br>Also pad message to fixed size"]
+
+    BHD --> ENC["Encrypt with the key shared with recipient<br>(producing nonce/ciphertext/aead_tag)"]
+
+    ENC --> FILL["Fill the cleartext header.<br>ver_type = DATA or ACK, flags, msg_id,<br>ttl = default, hop_count = 0,<br>src_pseudo = pseudonym, next_hop = 0,<br>epoch = current"]
+
+    FILL --> COMPUTE["Compute link_tag"]
+
+    COMPUTE --> ADD["Add msg_id to seen-cache<br>(so that echo gets dropped)"]
+
+    ADD --> DATA{"Is this DATA?"}
+
+    DATA --> |Yes| REGISTER["Register or Update 'Waiting for ACK'<br>(store text, recipient, and sequence number<br>for retries) and restart retry timer<br>with the next backoff (1s / 2s / 4s)"]
+    DATA --> |No| TRANSMIT
+    REGISTER --> TRANSMIT["Transmit and log"]
+
+    TRANSMIT --> FIRST{"New DATA,<br>first attempt?"}
+    FIRST --> |Yes| SENT(["Tell laptop that the message was sent"])
+    FIRST --> |No| DONE([Done])
+```
+
+A node sends a frame for one of 3 reasons: 
+- The laptop sends a message
+- The receive path needs to send an ACK
+- A retry timer goes off
+
+A message from the laptop that is over 153 bytes gets rejected with an error. If a retry has no retries left, the node tells the laptop the message failed and clears the "waiting for ACK" entry. Otherwise, every send builds a new frame with a fresh random `msg_id` (including retries), so that the relays don't drop them as duplicates. The node then builds the inner header (real sender, recipient, timestamp, sequence #, and length), pads the message to the fixed size, and encrypts it with the key shared with the recipient. A retry keeps the original sequence number so the recipient can tell it's the same message.
+
+Next, the node fills in the cleartext header (`ver_type`, `flags`, `msg_id`, `ttl` = default, `hop_count` = 0, `src_pseudo` = its own pseudonym, `next_hop` = 0, current `epoch`) and computes the `link_tag` last, since it covers the finished header. It also **adds its own `msg_id` to the seen_cache** so that the echo gets dropped. A DATA frame registers or updates a "waiting for ACK" entry (storing the text, recipient, & sequence # for retries) and restarts the retry timer at the next backoff (1s / 2s / 4s). ACKs skip this, since they never get acknowledged. Finally, the frame is transmitted right away and logged, and only the first attempt of a new DATA message tells the laptop it was sent.
+
 
 ### 5.3 Relay timing
 
