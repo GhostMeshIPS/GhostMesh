@@ -385,3 +385,36 @@ different channels and adds downtime at each boundary. **Documenting them is a d
 model that names its limits is more credible to judges than one that hides them, and each one has a
 named future-work path.
 
+---
+
+## 13. Crypto library: Monocypher 4.0.2
+
+**Decision:** vendor Monocypher 4.0.2, unmodified, in `firmware/lib/monocypher/`.
+
+| Option | Why not chosen / why chosen |
+|---|---|
+| **Monocypher (chosen)** | Two small portable C99 files plus an optional Ed25519 file, no dependencies, permissive dual licence. It has every primitive decisions 3–8 specify, so no redesign. It builds identically on the laptop (tests, sim) and on the ESP32-S3, and its outputs match the Python libraries our laptop tools use (verified). Cost: no hardware acceleration, so the Tuesday benchmark must confirm speed |
+| libsodium | Same primitives and direct PyNaCl compatibility, but far larger and awkward to vendor for an Arduino build; nothing it adds is needed |
+| mbedTLS (built into ESP-IDF) | Hardware SHA/AES on the S3, but no BLAKE2b and no XChaCha20, so tasks 3, 4 and 6 would have to be redesigned around HMAC-SHA256 and 12-byte nonces (nonce collisions become a real concern with random nonces) |
+
+**Why vendor instead of a package manager:** the toolchain isn't chosen yet (N6). Files in
+`firmware/lib/` work with PlatformIO, ESP-IDF (as a component), Arduino and plain gcc. Pinning exact files,
+with recorded hashes, also means everyone builds the same verified code (supply-chain hygiene for a security project).
+
+**Why verify twice:** the published SHA-512 sits on the same site as the tarball, so it only guards against
+corruption. Comparing the source against the GitHub tag is an independent second source. The interop test
+then checks the property we actually depend on: firmware and laptop tools compute identical bytes.
+
+---
+
+## 14. Crypto glue (stage 14a)
+
+| Choice | Alternatives | Why this one |
+|---|---|---|
+| **Staged: core now, ratchet in 14b** | Everything at once | Rashad's routing already calls `encrypt`, `try_decrypt`, `compute_link_tag` and `my_pseudonym`. Shipping those first unblocks integration and Tuesday's "encrypted frame round-trips" milestone. The ratchet slots in behind one function (`gm_peer_message_key`), so callers won't change. Cost: until 14b, keys come from the static root key, so there's no forward secrecy yet |
+| **Routing fills the AD fields before `encrypt()`** | Change the callback to pass them as arguments | A one-line reorder in Rashad's TODO keeps `routing.h`'s interface stable for everyone. Decision 6b requires those fields to be final when encrypting either way |
+| **Freshness in routing (`handle_data`)** | Inside `try_decrypt` | "What to do with a message" (freshness, seq dedup, re-ACK) stays in one place with its logging. `try_decrypt` answers exactly one question: is this authentic and for me? |
+| **Portable C + Python runner in `firmware/test/`** | Code and tests under `security/` | Same no-ESP-headers rule as `routing.c`, so it also runs in host tests and the sim. The runner needs only gcc and Python (no make/cmake), so any teammate can run it |
+| **Cross-check against an independent Python implementation** | C unit tests only | C tests show the code agrees with *itself*. Re-deriving every byte in Python with different libraries (libsodium, `cryptography`) shows it agrees with the *spec*. The laptop tools (keygen, pcap converter, IPS) must compute identical bytes, so those Python functions become their reference |
+| **Mutation check** | Trust a green run | The first run passed 54/54, but deliberately broken copies showed the recipient check, the sender check and the MAC bit-fix weren't really tested (each was hidden by another check or a lucky vector). Three targeted tests were added. A test suite that can't fail proves nothing |
+
