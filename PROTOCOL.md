@@ -198,6 +198,7 @@ _Owner: Rashad + Jose_
 | Neighbor expiry | TBD | |
 | ACK timeout / retries / backoff | TBD | |
 | Epoch length | TBD | |
+| Jitter random share | TBD | Start at 25%; sweep 12% / 25% / 50% in sim |
 
 ## 13. Metric definitions
 

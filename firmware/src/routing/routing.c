@@ -187,23 +187,37 @@ static void handle_data(rt_node_t *n, const rt_inner_t *in, const uint8_t msg_id
 
 static uint32_t jitter_ms(rt_node_t *n, int8_t rssi)
 {
-    /* TODO map rssi to a wait inside [jitter_min_ms, jitter_max_ms]:
-     *      weaker RSSI -> shorter wait, plus randomness from random_u32(). */
-    (void)rssi;
-    return n->cfg.jitter_min_ms;
+
+    //defining jitter / rssi range
+    uint16_t minimum = n->cfg.jitter_min_ms;
+    uint16_t range = n->cfg.jitter_max_ms - minimum;
+    uint32_t pct = n->cfg.jitter_rand_pct;
+    if (pct > 100) pct = 100;
+    uint32_t rand_span = range * pct / 100;
+    uint32_t rssi_span = range - rand_span;
+
+    //setting up clamps
+
+    if (rssi < n->cfg.rssi_weak){ rssi = n->cfg.rssi_weak; }
+    if (rssi > n->cfg.rssi_strong){ rssi = n->cfg.rssi_strong; }
+
+    int position = rssi - n->cfg.rssi_weak;
+    int rssi_range = n->cfg.rssi_strong - n->cfg.rssi_weak;
+
+    //setting up the jitter
+
+    uint32_t base = 0;
+    if (rssi_range > 0){
+        base = (uint32_t)position * rssi_span / (uint32_t)rssi_range;
+    }
+    uint32_t jitter = n->p->random_u32(n->ctx) % (rand_span + 1);
+
+    return minimum + base + jitter;
+
 }
 
 static void relay_schedule(rt_node_t *n, int slot, const rt_frame_t *f, int8_t rssi)
 {
-    /* TODO (REL) copy f into cache[slot].pending, then:
-     *      ttl--, hop_count++, src_pseudo = my_pseudonym(), next_hop = 0,
-     *      link_tag recomputed LAST.
-     *      relay_pending = true, dup_count = 0,
-     *      timer_start(make_token(RT_TIMER_RELAY, slot), jitter_ms(rssi)),
-     *      log RT_LOG_RELAY_SCHEDULED. */
-    (void)n; (void)slot; (void)f; (void)rssi;
-    (void)jitter_ms; (void)make_token;
-
     rt_cache_entry_t *e = &n->cache[slot];
     e->pending = *f;                                                       // copy f into cache[slot].pending
 
@@ -224,8 +238,13 @@ static void relay_schedule(rt_node_t *n, int slot, const rt_frame_t *f, int8_t r
 
 static void relay_fire(rt_node_t *n, int slot)
 {
-    /* TODO if still pending: transmit(cache[slot].pending), log RT_LOG_TX, relay_pending = false. */
-    (void)n; (void)slot;
+    rt_cache_entry_t *e = &n->cache[slot];
+
+    if(!e->relay_pending) return;                 // cancelled by k, or already sent
+
+    n->p->transmit(n->ctx, &e->pending);
+    n->p->log(n->ctx, RT_LOG_TX, &e->pending);
+    e->relay_pending = false;
 }
 
 /* ---- Send path (§5.2) --------------------------------------------------- */

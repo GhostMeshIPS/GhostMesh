@@ -108,6 +108,7 @@ typedef struct {
     int8_t   rssi_strong;          /* RSSI mapped to the longest wait */
     uint32_t cache_expiry_ms;
     uint32_t retry_backoff_ms[RT_MAX_ATTEMPTS - 1]; /* e.g. 1000, 2000, 4000 */
+    uint8_t jitter_rand_pct;       /* share of the jitter window that's random, 0-100 */
 } rt_config_t;
 
 /* ---- Node state --------------------------------------------------------
