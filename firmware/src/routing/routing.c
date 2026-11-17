@@ -132,7 +132,7 @@ static int cache_insert(rt_node_t *n, const uint8_t msg_id[8])
             victim = i;
             break;
         }
-        
+
         uint32_t age = now - e->seen_at_ms;
         if(age > n->cfg.cache_expiry_ms){        //expired slot
             victim = i;
@@ -203,6 +203,23 @@ static void relay_schedule(rt_node_t *n, int slot, const rt_frame_t *f, int8_t r
      *      log RT_LOG_RELAY_SCHEDULED. */
     (void)n; (void)slot; (void)f; (void)rssi;
     (void)jitter_ms; (void)make_token;
+
+    rt_cache_entry_t *e = &n->cache[slot];
+    e->pending = *f;                                                       // copy f into cache[slot].pending
+
+    e->pending.ttl--;                                                      // decrease ttl, increase hop count, set the pseudonym, and set next_hop = 0
+    e->pending.hop_count++;
+    n->p->my_pseudonym(n->ctx, e->pending.src_pseudo);
+    memset(e->pending.next_hop, 0, 4);
+    n->p->compute_link_tag(n->ctx, &e->pending, e->pending.link_tag);
+
+    e->relay_pending = true;
+    e->dup_count = 0;
+
+    uint32_t delay = jitter_ms(n, rssi);                                   // start timer and set delay
+    n->p->timer_start(n->ctx, make_token(RT_TIMER_RELAY, (uint32_t)slot), delay);
+    n->p->log(n->ctx, RT_LOG_RELAY_SCHEDULED, f);
+
 }
 
 static void relay_fire(rt_node_t *n, int slot)
