@@ -1,7 +1,7 @@
 # GhostMesh security design: why we built it this way
 
 Owner: Jose Perez (Network #2). This is the companion to
-[`design-decisions.md`](design-decisions.md). That file says **what** we decided; this one
+[`project-breakdown.md` §4.7](../docs/planning/project-breakdown.md). That file says **what** we decided; this one
 says **why**: which construction we picked, what else we considered, and which project
 needs made the choice the right one.
 

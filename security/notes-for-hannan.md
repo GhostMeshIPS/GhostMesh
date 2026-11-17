@@ -1,7 +1,7 @@
 # Network #2 → AI/ML: answers to `IPS_DATA_NEEDS.md`
 
 From: Jose (Network #2). To: Hannan (AI/ML).
-Full detail and rationale: [`design-decisions.md`](design-decisions.md) (what) and
+Full detail and rationale: [`project-breakdown.md` §4.7](../docs/planning/project-breakdown.md) (what) and
 [`protocol-design-motivation.md`](protocol-design-motivation.md) (why).
 
 > **Status:** these are Network #2's decisions. The items marked **(needs team sign-off)** change the

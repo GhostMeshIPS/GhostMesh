@@ -2,7 +2,7 @@
  * gm_crypto.h - GhostMesh security primitives (Network #2), stage 14a.
  *
  * Portable C99: no ESP32 headers, so the same code runs in firmware, host
- * tests and the sim. Spec: PROTOCOL.md §9. Decisions: security/design-decisions.md.
+ * tests and the sim. Spec: PROTOCOL.md §9. Decisions: docs/planning/project-breakdown.md §4.7.
  *
  * Stage 14a (gm_crypto.c): link_tag, pseudonym/MAC derivation, inner-header codec,
  * end-to-end encrypt / trial-decrypt, CTRL sign/verify.

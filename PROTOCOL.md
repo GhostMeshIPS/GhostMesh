@@ -222,7 +222,7 @@ _Owner: Jose_
 
 > **Status:** decided by Network #2. Items marked ⚑ change the shared frame format or `ver_type` list and
 > need team sign-off. Rationale for every choice: [`security/protocol-design-motivation.md`](security/protocol-design-motivation.md);
-> decision log and open items: [`security/design-decisions.md`](security/design-decisions.md).
+> decision log and open items: [`docs/planning/project-breakdown.md` §4.7](docs/planning/project-breakdown.md).
 > **Byte order:** big-endian for every multi-byte field. **Hash:** keyed BLAKE2b (Monocypher /
 > Python `hashlib.blake2b`), with the output length set by `digest_size`, never by truncation.
 

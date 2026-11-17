@@ -1,7 +1,7 @@
 # GhostMesh threat model
 
 Owner: Jose Perez (Network #2). Spec: [`PROTOCOL.md` §9](../PROTOCOL.md). Decisions and open items:
-[`design-decisions.md`](design-decisions.md). Rationale: [`protocol-design-motivation.md`](protocol-design-motivation.md).
+[`project-breakdown.md` §4.7](../docs/planning/project-breakdown.md). Rationale: [`protocol-design-motivation.md`](protocol-design-motivation.md).
 
 ## 1. What we protect (assets)
 
