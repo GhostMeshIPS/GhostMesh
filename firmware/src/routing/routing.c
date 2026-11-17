@@ -122,11 +122,38 @@ static int cache_find(rt_node_t *n, const uint8_t msg_id[8])
 
 static int cache_insert(rt_node_t *n, const uint8_t msg_id[8])
 {
-    /* TODO pick a slot: a free or expired one, else evict (oldest? decide).
-     *      Don't evict an entry whose relay is still pending without cancelling its timer.
-     *      Return the slot index. */
-    (void)n; (void)msg_id;
-    return -1;
+    uint32_t now = n->p->now_ms(n->ctx);
+    int victim = -1;
+    uint32_t oldest_age = 0;
+
+    for(int i = 0; i < RT_CACHE_SIZE; i++){     //searching through slots (find unused/expired/oldest)
+        rt_cache_entry_t *e = &n->cache[i];
+        if(!e->used){                            //free slot
+            victim = i;
+            break;
+        }
+        
+        uint32_t age = now - e->seen_at_ms;
+        if(age > n->cfg.cache_expiry_ms){        //expired slot
+            victim = i;
+            break;
+        }
+        if(age >= oldest_age){                   //oldest so far
+            oldest_age = age;
+            victim = i;
+        }
+    }
+
+    rt_cache_entry_t *e = &n->cache[victim];
+    if (e->used && e->relay_pending){           // evicting a live relay
+        n->p->timer_cancel(n->ctx, make_token(RT_TIMER_RELAY, (uint32_t)victim));
+    }
+
+    memset(e, 0, sizeof *e);                    //wiping the slot and filling it in (clears relay_pending, dup_count, pending frame)
+    e->used = true;
+    memcpy(e->msg_id, msg_id, 8);
+    e->seen_at_ms = now;
+    return victim;
 }
 
 /* ---- Receive helpers ---------------------------------------------------- */
