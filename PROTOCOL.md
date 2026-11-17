@@ -160,11 +160,149 @@ _Owner: Rashad_
 
 _Owner: Jose_
 
-- `link_tag`: key, coverage, per-hop recompute
-- End-to-end encryption and trial decryption
-- Replay protection
-- Pseudonym and MAC rotation
-- Signed BLOCK messages
+> **Status:** decided by Network #2. Items marked ⚑ change the shared frame format or `ver_type` list and
+> need team sign-off. Rationale for every choice: [`security/protocol-design-motivation.md`](security/protocol-design-motivation.md);
+> decision log and open items: [`security/design-decisions.md`](security/design-decisions.md).
+> **Byte order:** big-endian for every multi-byte field. **Hash:** keyed BLAKE2b (Monocypher /
+> Python `hashlib.blake2b`), with the output length set by `digest_size`, never by truncation.
+
+### 9.1 Keys and who holds them
+
+| Key | Size | Held by | Purpose |
+|---|---|---|---|
+| `network_key` | 32 B | all nodes + watchtower | `link_tag` (9.4) |
+| `pseudo_secret` | 32 B per node | that node + watchtower | pseudonym and MAC derivation (9.3); lets the watchtower map frames to real nodes |
+| X25519 static key pair | 32 B + 32 B per node | private: that node; public: all nodes | root key per pair (9.6) |
+| Ed25519 key pair | 32 B + 32 B | private: watchtower only; public: all nodes | signs CTRL frames (9.8) |
+
+All keys come from `security/keygen.py` and go into `firmware/config/keys/` (gitignored). The watchtower
+never holds X25519 private keys, so it can tell **who** transmitted but can't read messages.
+
+### 9.2 Clock and epochs
+
+- **Mesh clock:** Unix time in ms. The IPS laptop sets the watchtower's clock over serial, and the watchtower
+  floods a signed **TIME** CTRL frame every 10 s (9.8).
+- **Nodes** only move their clock forward: `clock = max(local, issued_at_ms)`. Corrections under 1 s are
+  spread over ~5 s. `last_beacon_ms` is saved to NVS each epoch. If no valid beacon arrives for 30 s, the node
+  prints the serial event `no_beacon` and keeps running on its own clock.
+- **Epoch:** `epoch = floor(unix_s / 60) mod 65536` (60 s). Every node rotates its pseudonym **and** MAC at the
+  same moment.
+- **Accepted epochs:** previous, current, next (±1). Relays and recipients drop anything else.
+- **Before first sync:** a node receives and decrypts but doesn't transmit or relay. Laptop sends are
+  queued (max 8; rejected when full).
+
+### 9.3 Pseudonyms and MAC rotation
+
+```
+pseudo = BLAKE2b(key=pseudo_secret, digest_size=4, "GM-PSEUDO" || epoch_be16)
+mac    = BLAKE2b(key=pseudo_secret, digest_size=6, "GM-MAC"    || epoch_be16)
+mac[0] = (mac[0] & 0xFC) | 0x02          # locally administered, unicast
+```
+- Reserved pseudonyms: `0x00000000` (the flood marker in `next_hop`) and `0xFFFFFFFF`. If the hash produces one,
+  rehash with a counter byte appended (`… || 0x01`, `0x02`, …).
+- The watchtower derives every node's pseudonym and MAC each epoch, tags each log line with
+  `"node"` (`A`–`D`, `X`, or `?`), and can check that a frame's MAC matches its pseudonym.
+- Test vector: `pseudo_secret = 00 01 … 1f`, epoch `0x0102` → pseudo `ac341587`, MAC `6a:a7:07:ca:0e:dd`.
+
+### 9.4 `link_tag`, cleartext fields
+
+```
+link_tag = BLAKE2b(key=network_key, digest_size=8, "GM-LINK" || frame[0:22] || frame[30:240])
+```
+- Covers **every byte except the tag itself**, so outsiders can't change any field or swap the body.
+- Computed **last** by the sender and by every relay (relays rewrite `src_pseudo`, `ttl`, `hop_count` and
+  `next_hop`). Verified **first** on receive, with a constant-time compare. On failure: drop and log `BAD_LINK_TAG`.
+- Frame offsets: `ver_type` 0, `flags` 1, `msg_id` 2–9, `ttl` 10, `hop_count` 11, `src_pseudo` 12–15,
+  `next_hop` 16–19, `epoch` 20–21, `link_tag` 22–29, `nonce` 30–53, `ciphertext` 54–223, `aead_tag` 224–239.
+- Test vector: `network_key = 20 21 … 3f`, frame byte *i* = *i* → `152ee8ad612ca586`.
+- `flags`: bit 0 = SOS (left in cleartext so relays can prioritise it). All other bits are 0. ⚑ The §4.1
+  "needs-ACK" flag is removed, because it would reveal DATA vs. ACK.
+- ⚑ Cleartext `ver_type` values: **DATA, HELLO, CTRL, KEYS** (numbers TBD with Rashad). ACKs are sent as
+  DATA, and BLOCK is now a CTRL subtype.
+
+### 9.5 Inner header (inside the 170-byte ciphertext)
+
+| Bytes | Field | Notes |
+|---|---|---|
+| 0–3 | `sender_id` | real node ID |
+| 4–7 | `recipient_id` | real node ID |
+| 8–11 | `timestamp_ms` | mesh clock, mod 2³²; fresh on every attempt |
+| 12–15 | `seq` | per sender→recipient; random start each boot |
+| 16 | `type` | DATA or ACK (the real type; cleartext always says DATA) |
+| 17 | `len` | ≤ 152 for DATA, 8 for ACK |
+| 18–169 | `body` | ⚑ **152 bytes max** (not 153), zero-padded. ACK body = the acknowledged attempt's `msg_id` |
+
+After decrypting, the recipient checks that `recipient_id` is itself and that `sender_id` is the peer whose key worked.
+
+### 9.6 End-to-end encryption: epoch DH ratchet
+
+- **Root key per pair:** `root = BLAKE2b(32, "GM-ROOT" || X25519(sk_me, pk_peer) || pk_lo || pk_hi)`.
+- **Chain start / resync:** `ck[e] = BLAKE2b(key=root, 32, "GM-RESYNC" || e_be16)`.
+- **Each epoch e:** every node makes a fresh X25519 key pair `r(e+1)` and floods its public half in a **KEYS**
+  frame about every 10 s, along with a confirmation hash of each peer key it has received.
+- **Boundary e → e+1 (chained DH):** `ck[e+1] = BLAKE2b(key=ck[e], 32, "GM-CHAIN" || (e+1)_be16 || DH)`,
+  where `DH = X25519(r_me(e+1).sk, r_peer(e+1).pk)`. The DH is included only if this node holds the peer's key
+  **and** the peer has confirmed holding ours; otherwise `DH` is empty. A node that can compute both versions
+  keeps the other one as an alternate. If a peer's KEYS tag or message verifies under it, **the DH version wins**.
+- **Message key:** `mk[e] = BLAKE2b(key=ck[e], 32, "GM-MSG")`. AEAD: XChaCha20-Poly1305 with a random
+  24-byte `nonce`; associated data `ver_type || flags || msg_id || epoch` (`frame[0:10] || frame[20:22]`).
+- **Trial decryption:** every DATA frame that passes `link_tag` is tried with each peer's `mk` for the
+  frame's epoch (plus the alternate at a boundary). That's usually 8–16 tag checks, with no X25519 per frame.
+- **Deletion:** keep `ck` for the current and previous epoch only, and wipe `r(e).sk` once epoch e+1 has passed.
+  State is saved to NVS once per epoch. Static keys stay on the board (RESYNC needs them).
+- **KEYS frame** ⚑ (flooded like DATA). In the 170-byte region: `target_epoch`(2) ‖ `mode`(1: normal /
+  resync) ‖ `next_pk`(32) ‖ 8 slots × [`tag`(8) ‖ `conf`(4)]; the rest, plus `nonce` and `aead_tag`, is random.
+  `tag[P] = BLAKE2b(key=ck[e][me,P] (root in resync mode), 8, "GM-KEYS" || target_epoch || mode || next_pk || conf)`;
+  `conf = BLAKE2b(4, "GM-CONF" || peer's r(e+1) pk)`. Slots are in random order, and unused slots are random bytes.
+- **RESYNC:** if no KEYS frame from an expected peer verifies for 2 epochs (or on first boot), flood a KEYS
+  frame in resync mode carrying the epoch and a random 8-byte nonce. Both sides then reset using the chain-start
+  formula. At most one per pair per 5 epochs; repeated nonces are ignored; serial event `resync`.
+- **Alerts:** if a pair has had no DH step for 3 epochs, print the serial event `no_dh`.
+
+### 9.7 Replay protection (outermost first)
+
+1. Relays: `link_tag`; the 60 s seen-cache; a separate **180 s cache of `msg_id`s only** (~512 entries).
+2. Epoch window ±1, with `epoch` bound in the AEAD associated data.
+3. Key deletion: frames older than ~2 epochs can't be decrypted.
+4. Recipient freshness: accept DATA only if `|now − timestamp_ms| ≤ 5 s`. Stale: drop silently, log
+   `REPLAY_STALE`, **no ACK**.
+5. Recipient duplicate check: seqs seen per peer in the last **15 s** (set membership). Fresh and new: deliver
+   and ACK. Fresh but already seen: ACK again only.
+- Retries: new `msg_id`, **same seq, new timestamp**. ACKs are sent after a random 0–400 ms delay.
+
+### 9.8 Signed control frames (CTRL) ⚑
+
+- Ed25519 (RFC 8032), signed by the watchtower over `"GM-CTRL" || subtype || issued_at_ms || payload`.
+- Layout in the 170-byte region: `subtype`(1) ‖ `issued_at_ms`(8) ‖ payload ‖ `sig`(64). The rest of the
+  region, `nonce` and `aead_tag` are random.
+  - **TIME:** no payload. Accepted only if newer than `last_beacon_ms` (9.2).
+  - **BLOCK:** `block_id`(4) ‖ `until_ms`(8) ‖ `reason`(1: flood/replay/spoof/routing/manual) ‖ 2 ×
+    [`pseudo`(4) ‖ `mac`(6) ‖ `epoch`(2)], one entry for the current epoch and one for the next. Re-issued every
+    epoch while active. Re-issuing with `until_ms = issued_at_ms` ends it early.
+- **Block matching:** a frame matches if `src_pseudo` matches **and** either its radio MAC matches or the target
+  MAC is all zeros. Matching frames are dropped right after the `link_tag` check and never relayed; log `BLOCKED`.
+- **Verify limits:** skip, without verifying, anything not newer than what the node already holds. Beyond that,
+  verify at most ~2 frames/s overall and 1 per 5 s per transmitter (`src_pseudo` + MAC). **Only verified CTRL
+  frames are relayed.**
+
+### 9.9 Flood hardening
+
+- **Hop padding:** the originator sends with `hop_count = pad` and `ttl = default_ttl − pad`, where `pad` is
+  random in {0, 1, 2}. `hop_count + ttl` stays constant, so the padding can't be seen.
+- **Cache insertion limit:** each transmitter (`src_pseudo` + MAC) may add at most ~20 new `msg_id`s per second
+  to the relay caches. Beyond that its frames are dropped (value to confirm with the sim).
+
+### 9.10 Known limitations
+
+Documented, not fixed:
+- On a quiet mesh, timing can still reveal who originated a message and pair senders with recipients (O1/O2 residual).
+- RSSI can track static boards across epochs (O3).
+- The network's existence is visible (O7).
+- An attacker spoofing a node completely can trick the IPS into blocking that real node (O9, open).
+- No key fingerprint check, no network-key revocation, keys unencrypted in flash, unauthenticated serial ports,
+  and a single jammable channel (O13–O17, open).
+- No protection against an attacker who holds a stolen chain or static key and actively forges KEYS frames.
+- Not quantum-resistant.
 
 ## 10. Serial protocol (node ⇄ laptop)
 
@@ -197,8 +335,23 @@ _Owner: Rashad + Jose_
 | HELLO interval | TBD | |
 | Neighbor expiry | TBD | |
 | ACK timeout / retries / backoff | TBD | |
-| Epoch length | TBD | |
+| Epoch length | 60 s | `floor(unix_s / 60) mod 65536` (§9.2) |
 | Jitter random share | TBD | Start at 25%; sweep 12% / 25% / 50% in sim |
+| Accepted epoch window | ±1 epoch | §9.2 |
+| Pre-sync send queue | 8 messages | Rejected when full (§9.2) |
+| TIME beacon interval | 10 s | Watchtower; alert after 30 s without one (§9.2) |
+| Clock slew | corrections < 1 s spread over ~5 s | Clock never moves backward (§9.2) |
+| KEYS interval | ~10 s (≈ 6 per epoch) | §9.6 |
+| Missing-DH alert | 3 epochs | §9.6 |
+| RESYNC trigger / limit | 2 epochs without a valid KEYS / max 1 per pair per 5 epochs | §9.6 |
+| Long relay `msg_id` cache | 180 s, ~512 entries | §9.7 |
+| Recipient freshness | 5 s | §9.7 |
+| Recipient seq memory | 15 s, ~16 per peer | §9.7 |
+| ACK delay | random 0–400 ms | §9.7 |
+| CTRL verify budget | ~2/s global, 1 per 5 s per transmitter | §9.8 |
+| Hop padding | 0–2 | Raise default TTL by 2 to keep range (§9.9) |
+| Cache insertion limit | ~20 new `msg_id`/s per transmitter | Confirm with sim (§9.9) |
+| Body max | 152 bytes | §9.5 |
 
 ## 13. Metric definitions
 
