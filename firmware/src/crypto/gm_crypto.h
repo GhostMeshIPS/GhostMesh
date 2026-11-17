@@ -218,6 +218,11 @@ bool gm_ctrl_verify(const gm_crypto_t *c, const uint8_t region[GM_INNER_BYTES],
                     uint8_t *subtype, uint64_t *issued_at_ms,
                     const uint8_t **payload, size_t *payload_len);
 
+/* ---- Key fingerprints (decision 15, closes O13) ----------------------------- */
+/* "1a2b-3c4d" = first 4 bytes of BLAKE2b("GM-FP" || key), for comparing a board's
+ * keys against firmware/config/roster.json. `out` must hold 10 chars. */
+void gm_fingerprint(const uint8_t key[32], char out[10]);
+
 /* ---- Big-endian helpers ---------------------------------------------------- */
 uint16_t gm_get_be16(const uint8_t *p);
 void     gm_put_be16(uint8_t *p, uint16_t v);

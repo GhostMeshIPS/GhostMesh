@@ -29,8 +29,10 @@ overwrites anyway.
 ## Wiring it into firmware (for Yunus)
 
 ```c
-gm_init(&g, MY_ID, network_key, pseudo_secret, x25519_sk, watchtower_pk, rng_fn, NULL);  /* rng: esp_fill_random */
-for (each peer) gm_add_peer(&g, peer_id, peer_x25519_pk);
+#include "keys_A.h"   /* from security/keygen.py, picked per board by a build flag (4 boards: D also includes keys_W.h) */
+gm_init(&g, GM_NODE_ID, GM_NETWORK_KEY, GM_PSEUDO_SECRET, GM_X25519_SK, GM_WATCHTOWER_PK, rng_fn, NULL);  /* rng: esp_fill_random */
+for (int i = 0; i < GM_PEER_COUNT; i++) gm_add_peer(&g, GM_PEERS[i].id, GM_PEERS[i].pk);
+char fp[10]; gm_fingerprint(g.x_pk, fp); /* print at boot; must match firmware/config/roster.json */
 if (nvs has "gm_state") gm_state_import(&g, blob, GM_STATE_BYTES);    /* ~1.5 KB */
 
 /* every ~100 ms */

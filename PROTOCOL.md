@@ -175,8 +175,14 @@ _Owner: Jose_
 | X25519 static key pair | 32 B + 32 B per node | private: that node; public: all nodes | root key per pair (9.6) |
 | Ed25519 key pair | 32 B + 32 B | private: watchtower only; public: all nodes | signs CTRL frames (9.8) |
 
-All keys come from `security/keygen.py` and go into `firmware/config/keys/` (gitignored). The watchtower
-never holds X25519 private keys, so it can tell **who** transmitted but can't read messages.
+All keys come from `security/keygen.py` (OS randomness only) as one secret header per board in
+`firmware/config/keys/` (gitignored). The watchtower never holds X25519 private keys, so it can tell **who**
+transmitted but can't read messages. Node IDs: A=1, B=2, C=3, D=4, W=5 (watchtower), X=6 (insider attacker,
+keyed like any node).
+
+**Fingerprints:** `1a2b-3c4d` = first 4 bytes of `BLAKE2b("GM-FP" || key)` over each node's X25519 public key, the
+watchtower's Ed25519 public key and the network key. keygen writes them to the public
+`firmware/config/roster.json`; every board prints `gm_fingerprint()` of the keys it loaded at boot, and the two must match.
 
 ### 9.2 Clock and epochs
 

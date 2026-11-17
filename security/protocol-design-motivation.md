@@ -445,3 +445,16 @@ then checks the property we actually depend on: firmware and laptop tools comput
 promises: the thief reads the stolen epoch and the next one (it holds the next DH key), then is locked out, while
 the real node keeps reading. That is the claim in the threat model (A4), demonstrated rather than asserted.
 
+---
+
+## 15. Key provisioning (closes O13)
+
+| Choice | Alternatives | Why this one |
+|---|---|---|
+| **Per-board C header + public roster** | Per-board blob flashed into NVS | Headers work with whichever toolchain Yunus picks (Arduino, ESP-IDF, PlatformIO) and need no flashing tool. The roster separates what can be shared (public keys, fingerprints) from what can't, so it can live in the repo for everyone to check against. Cost: one build per board, which a build flag handles |
+| **X as a full insider** | Network key only; no keys | Threat model A3 is a *captured board*, which has everything a node has. A half-keyed X would set off "unverifiable KEYS" alarms the real attack wouldn't, and spoofing and routing abuse can't be demonstrated without the network key. The watchtower can also label X's frames, which the IPS needs for ground truth |
+| **8-hex fingerprints, printed from the key in use** | Word list | They fit a small OLED and serial line, with nothing extra in firmware. **Printing the fingerprint of the key the board actually loaded**, not a string from the header, is what catches tampering: a swapped key in a header would still carry the old fingerprint comment. 32 bits is plenty against tampering at provisioning, where the attacker can't search for collisions |
+| **OS randomness only** | A seeded test mode | A guessable key set that could be flashed by mistake is a real risk in a hackathon rush. Tests already use their own fixed patterns and never need keygen to be deterministic |
+| **Refuse to overwrite without `--force`** | Overwrite silently | Re-running keygen on one laptop would quietly re-key the network and break every board already flashed |
+| **Watchtower header has no X25519 keys** | One "all keys" file | Enforces decision 1 at provisioning time: the watchtower can identify nodes but can't read messages, and the tests check this |
+

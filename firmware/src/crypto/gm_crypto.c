@@ -38,6 +38,23 @@ void gm_put_be64(uint8_t *p, uint64_t v)
     gm_put_be32(p, (uint32_t)(v >> 32)); gm_put_be32(p + 4, (uint32_t)v);
 }
 
+/* ---- Key fingerprints ----------------------------------------------------- */
+
+void gm_fingerprint(const uint8_t key[32], char out[10])
+{
+    static const char hexd[] = "0123456789abcdef";
+    uint8_t msg[5 + 32], h[4];
+    memcpy(msg, "GM-FP", 5);
+    memcpy(msg + 5, key, 32);
+    crypto_blake2b(h, 4, msg, sizeof msg);
+    for (int i = 0, o = 0; i < 4; i++) {
+        if (i == 2) out[o++] = '-';
+        out[o++] = hexd[h[i] >> 4];
+        out[o++] = hexd[h[i] & 15];
+    }
+    out[9] = '\0';
+}
+
 /* ---- Small internals ------------------------------------------------------ */
 
 static bool all_zero(const uint8_t *p, size_t n)       /* constant time */
