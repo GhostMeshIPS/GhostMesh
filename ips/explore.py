@@ -11,21 +11,21 @@ print(df.head()) #first 5 rows: check the columns and values look right
 print(df.shape) # (rows, columns): expect (597, 11)
 
 #2. Packets per node - should be ~150 each
-# groupby("mac") splits the table into one group per node; .size() counts the number of rows in each group
-print(df.groupby("mac").size())
+# groupby("node") splits the table into one group per node; .size() counts the number of rows in each group
+print(df.groupby("node").size())
 
 #3. RSSI per node -- mean should be near -48 / -60 / -67 / -75, std near 2
 # For each node, take the rssi column and compute its average and spread
 # mean = the node's typical signal strength; std = how much it wobbles.
-print(df.groupby("mac")["rssi"].agg(["mean", "std"]))
+print(df.groupby("node")["rssi"].agg(["mean", "std"]))
 
 #4. Time between HELLOs per node -- should be ~2.0 s
 # gap= this packet's time minus the same node's previous packet time.
 # grouptby first so we never subtract a different node's packet
 # Each node's first packet has no previous packet, so the gap is NaN (blank)
 # This is our first feature: a flood would make gaps tiny.
-df["gap"] = df.groupby("mac")["t"].diff()
+df["gap"] = df.groupby("node")["t"].diff()
 
 # Summarize gaps per node. min/max catch outlies the mean would hide
 # Expect mean ~2.0, min >= 1.8, max <= 2.2 (HELLO_PERIOD +- JITTER in synth.py)
-print(df.groupby("mac")["gap"].agg(["mean", "std", "min", "max"]))
+print(df.groupby("node")["gap"].agg(["mean", "std", "min", "max"]))

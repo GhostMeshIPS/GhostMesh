@@ -6,9 +6,14 @@ from sklearn.ensemble import IsolationForest, RandomForestClassifier
 from sklearn.metrics import classification_report
 from features import build_features   # reuse the Step 3 feature builder
 
-# Baseline detector: a fixed threshold picked by looking at the data.
+# Baseline detector: fixed thresholds a human would write from the protocol spec.
 # Normal nodes send ~1 packet per window, the flood ~30, so 15 sits safely between.
 RATE_THRESHOLD = 15  # packets per window
+# HELLOs are sent every 2 s (0.5/s), so 2+ in one second means someone is beaconing too fast.
+HELLO_THRESHOLD = 1  # HELLOs per window
+# No rule on ttl_max on purpose: real DATA packets legitimately carry TTL > 1, so a
+# "ttl_max > 1" rule would only work on our HELLO-only synthetic data (unfair to the rule).
+RULE_NAME = f"Rule (pkts > {RATE_THRESHOLD} or HELLOs > {HELLO_THRESHOLD})"
 
 # Columns the ML models learn from: behaviour only. Left out on purpose:
 #   mac, window -> identifiers, not behaviour (the model would memorise who/when)
@@ -23,13 +28,12 @@ BENCH_PATH = "models/benchmark.json"    # test-session scores of all 3 detectors
 
 
 def rule_detect(feats):
-    """Flag every window whose packet count is above the threshold.
+    """Flag every window that breaks either threshold (too many packets OR too many HELLOs).
 
-    Vectorized: compares the whole pkt_count column at once and returns a
-    True/False Series (one value per window). No if/else needed, because the
-    comparison itself already produces True/False.
+    Vectorized: compares whole columns at once and returns a True/False Series
+    (one value per window). `|` means OR, element by element.
     """
-    return feats["pkt_count"] > RATE_THRESHOLD
+    return (feats["pkt_count"] > RATE_THRESHOLD) | (feats["hello_count"] > HELLO_THRESHOLD)
 
 
 def evaluate(y_true, y_pred):
@@ -155,7 +159,7 @@ if __name__ == "__main__":
     # Attack vs. normal for every detector, so the numbers are directly comparable.
     y_test = test["label"] != "normal"
     bench = {
-        "Rule (pkt_count > 15)": evaluate(y_test, rule_detect(test)),
+        RULE_NAME: evaluate(y_test, rule_detect(test)),
         "Isolation Forest": evaluate(y_test, iforest_detect(model, test)),
         "Random Forest": evaluate(y_test, test["pred_rf"] != "normal"),
     }

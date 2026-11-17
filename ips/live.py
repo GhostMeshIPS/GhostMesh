@@ -7,13 +7,18 @@ Run on the real watchtower (when hardware is ready):
 
 Writes what it sees to data/live_windows.jsonl and data/live_events.jsonl,
 which dashboard.py reads.
+
+Everything is tracked per `node` (the watchtower's real-node letter, A-D / X), which stays
+the same when MACs and pseudonyms rotate. Radios the watchtower can't match fall back to
+their MAC (see features.add_identity).
 """
 import argparse
 import json
 import os
 import time
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
+from statistics import median
 
 import joblib
 import pandas as pd
@@ -23,7 +28,7 @@ from explain import EVIDENCE, explain
 from features import WINDOW, build_features
 from ingest import open_serial, replay, read_file, serial_stream
 from retention import WINDOWS_MAX_AGE_S, prune_jsonl
-from schema import encode_cmd, make_block_cmd, make_unblock_cmd
+from schema import WATCHTOWER, encode_cmd, make_block_cmd, make_unblock_cmd
 
 BUFFER_SECONDS = 10   # recent history kept in memory (needed for gaps across windows)
 CONFIRM_WINDOWS = 2   # attack must be seen in this many windows in a row before acting
@@ -31,6 +36,14 @@ BLOCK_SECONDS = 60    # how long a BLOCK lasts before it expires
 
 BLOCK_ATTACKS = {"flood", "routing", "replay"}   # we BLOCK these
 ALERT_ONLY = {"spoof"}                           # blocking a spoofed ID would cut off the real victim
+
+# Open issue O9 (Jose): an attacker that copies node A's identity and misbehaves would get the
+# REAL node A blocked. So before auto-blocking one of our nodes, compare the attacking traffic's
+# signal strength with that node's own normal history. A big jump = maybe a different radio
+# wearing A's identity -> don't auto-block A; ask the operator, and block only the exact
+# (pseudo, MAC) pair seen on air if they confirm.
+RSSI_JUMP_DB = 6.0        # boards sit still, so honest RSSI stays within a few dB (synthetic noise: 2 dB)
+RSSI_HISTORY_MIN = 10     # need at least this many normal windows before trusting a node's baseline
 
 WINDOWS_LOG = "data/live_windows.jsonl"
 EVENTS_LOG = "data/live_events.jsonl"
@@ -48,14 +61,17 @@ class LiveIPS:
         self.send_cmd = send_cmd              # function that delivers a BLOCK (print, serial, ...)
         self.buffer = []                      # recent packets
         self.current_window = None
-        self.streak = defaultdict(int)        # mac -> attack windows in a row
-        self.streak_rows = defaultdict(list)  # mac -> the windows in the current streak (the evidence)
-        self.last_attack_w = {}               # mac -> last window it was flagged in
-        self.blocks = {}                      # mac -> time the block expires
-        self.pending = {}                     # mac -> (attack, evidence) waiting for the operator (confirm mode)
-        self.dismissed = set()                # macs whose current attack the operator chose to ignore
+        self.streak = defaultdict(int)        # node -> attack windows in a row
+        self.streak_rows = defaultdict(list)  # node -> the windows in the current streak (the evidence)
+        self.last_attack_w = {}               # node -> last window it was flagged in
+        self.blocks = {}                      # node -> time the block expires
+        self.block_target = {}                # node -> (pseudo, mac, pair_only) the block was sent for
+        self.pending = {}                     # node -> (attack, evidence, pair_only) waiting for the operator
+        self.dismissed = set()                # nodes whose current attack the operator chose to ignore
         self.cmd_offset = 0                   # how far into COMMANDS_LOG we've read
         self.recent_normal = deque(maxlen=300)   # recent normal windows: "what normal looks like"
+        # node -> its recent normal signal strengths. Only possible now that `node` doesn't rotate.
+        self.rssi_history = defaultdict(lambda: deque(maxlen=120))
         self.offset = 0.0                     # real clock time minus packet time (t), from rx_t
         self.last_prune = 0.0
         # One background worker for the LLM, so a slow explanation never delays a BLOCK
@@ -63,8 +79,8 @@ class LiveIPS:
 
     def feed(self, pkt):
         """Take one packet. When a new second starts, analyse the second that just ended."""
-        if pkt["type"] == "BLOCK":
-            return                            # our own BLOCK broadcasts are not traffic to judge
+        if pkt["type"] == "BLOCK" or pkt.get("node") == WATCHTOWER:
+            return                            # the watchtower's own frames (BLOCKs, time beacons) aren't judged
         # t = the packet's own timeline (used for all the maths);
         # offset turns it into real clock time for display ("wall" in the logs)
         self.offset = pkt.get("rx_t", pkt["t"]) - pkt["t"]
@@ -104,67 +120,116 @@ class LiveIPS:
 
         for (_, row), pred, conf, by_rule, by_if, score in zip(rows.iterrows(), preds, confs,
                                                                 rule_says, if_says, anomaly):
-            mac = row["mac"]
+            node = row["node"]
             record = {"t": w * WINDOW, "wall": round(w * WINDOW + self.offset, 3),
-                      "mac": mac, "pred": pred, "conf": round(float(conf), 3),
+                      "node": node, "mac": row["mac"],          # mac = the one on air this second (display only)
+                      "pred": pred, "conf": round(float(conf), 3),
                       "rule": by_rule, "iforest": by_if, "anomaly": score,
                       "label": row.get("label"),               # ground truth, only in synthetic data
                       **{f: float(row[f]) for f in FEATURES}}
             log_line(WINDOWS_LOG, record)
 
             if pred == "normal":
-                self.streak[mac] = 0
-                self.streak_rows[mac] = []
-                self.dismissed.discard(mac)            # a dismissed attack that ended: watch it fresh again
+                self.streak[node] = 0
+                self.streak_rows[node] = []
+                self.dismissed.discard(node)           # a dismissed attack that ended: watch it fresh again
                 self.recent_normal.append(record)
+                self.rssi_history[node].append(record["rssi_mean"])
                 continue
             # Count only CONSECUTIVE attack windows: a gap (node went quiet) restarts the count
-            if self.last_attack_w.get(mac) == w - 1:
-                self.streak[mac] += 1
+            if self.last_attack_w.get(node) == w - 1:
+                self.streak[node] += 1
             else:
-                self.streak[mac] = 1
-                self.streak_rows[mac] = []
-                self.dismissed.discard(mac)
-            self.last_attack_w[mac] = w
-            self.streak_rows[mac].append(record)
+                self.streak[node] = 1
+                self.streak_rows[node] = []
+                self.dismissed.discard(node)
+            self.last_attack_w[node] = w
+            self.streak_rows[node].append(record)
 
-            if self.streak[mac] >= CONFIRM_WINDOWS:
-                self.respond(mac, pred, now, first=self.streak[mac] == CONFIRM_WINDOWS)
+            if self.streak[node] >= CONFIRM_WINDOWS:
+                self.respond(node, pred, now, first=self.streak[node] == CONFIRM_WINDOWS)
 
-    def evidence(self, mac):
+    def evidence(self, node):
         """Why we're acting: average features, confidence, and what the other detectors said."""
-        rows = self.streak_rows[mac]
-        return {
+        rows = self.streak_rows[node]
+        ev = {
             "conf": round(sum(r["conf"] for r in rows) / len(rows), 3),
             "rule_caught": any(r["rule"] for r in rows),
             "iforest_caught": None if rows[0]["iforest"] is None else any(r["iforest"] for r in rows),
             "features": {f: round(sum(r[f] for r in rows) / len(rows), 3) for f in FEATURES},
         }
+        jump = self.rssi_jump(node)
+        if jump is not None:
+            ev["rssi_jump_db"] = round(jump, 1)
+        return ev
 
-    def respond(self, mac, attack, now, first):
+    def rssi_jump(self, node):
+        """How far (dB) the attacking traffic's signal is from this node's normal signal.
+        None if we don't know this node's normal level yet (e.g. a never-seen radio)."""
+        history = self.rssi_history.get(node)
+        if not history or len(history) < RSSI_HISTORY_MIN:
+            return None
+        attack_rssi = median(r["rssi_mean"] for r in self.streak_rows[node])
+        return abs(attack_rssi - median(history))
+
+    def respond(self, node, attack, now, first):
         """Act on a confirmed attack. `first` = the moment it was confirmed (avoid repeat alerts)."""
         if attack in ALERT_ONLY:
             if first:
-                self.event(now, "ALERT", mac, attack, "alert only (blocking would cut off the victim)",
-                           self.evidence(mac))
-        elif attack in BLOCK_ATTACKS and mac not in self.blocks and mac not in self.dismissed:
+                self.event(now, "ALERT", node, attack, "alert only (blocking would cut off the victim)",
+                           self.evidence(node))
+        elif attack in BLOCK_ATTACKS and node not in self.blocks and node not in self.dismissed:
             # new attack, or still attacking after an old block expired
-            if auto_block_enabled():
-                self.block(mac, attack, now, self.evidence(mac), f"blocked for {BLOCK_SECONDS}s")
-            elif mac not in self.pending:
+            jump = self.rssi_jump(node)
+            spoof_like = jump is not None and jump > RSSI_JUMP_DB
+            if spoof_like:
+                # O9: never auto-block a whole node on spoof-like evidence. Ask the operator,
+                # even with auto-block on; a confirmed block targets only the (pseudo, MAC) pair.
+                if node not in self.pending:
+                    ev = self.evidence(node)
+                    self.pending[node] = (attack, ev, True)
+                    self.event(now, "PENDING", node, attack,
+                               f"signal is {jump:.0f} dB off this node's usual level: possibly another radio "
+                               f"using its identity, so the IPS won't block the whole node by itself", ev)
+            elif auto_block_enabled():
+                self.block(node, attack, now, self.evidence(node), f"blocked for {BLOCK_SECONDS}s")
+            elif node not in self.pending:
                 # Confirm-click mode: ask the operator instead of blocking on our own
-                ev = self.evidence(mac)
-                self.pending[mac] = (attack, ev)
-                self.event(now, "PENDING", mac, attack, "waiting for the operator to confirm the BLOCK", ev)
+                ev = self.evidence(node)
+                self.pending[node] = (attack, ev, False)
+                self.event(now, "PENDING", node, attack, "waiting for the operator to confirm the BLOCK", ev)
 
-    def block(self, mac, attack, now, evidence, note):
-        """Send a BLOCK to the watchtower (which signs and broadcasts it) and record it."""
-        pseudo = next((p["pseudo"] for p in reversed(self.buffer) if p["mac"] == mac), "")
+    def on_air(self, node):
+        """The (pseudo, mac) pair doing the attacking for this node right now.
+
+        The pair with the MOST packets in the last CONFIRM_WINDOWS seconds, not simply the
+        latest packet: during a spoof, the latest "node A" packet may be the real A's quiet
+        HELLO, and we must not block the victim's pair. The attacker is the noisy one.
+        """
+        if not self.buffer:
+            return "", ""
+        since = self.buffer[-1]["t"] - CONFIRM_WINDOWS
+        pairs = Counter((p["pseudo"], p["mac"]) for p in self.buffer
+                        if p["t"] >= since and (p.get("node") == node or p["mac"] == node))
+        return pairs.most_common(1)[0][0] if pairs else ("", "")
+
+    def block(self, node, attack, now, evidence, note, pair_only=False):
+        """Send a BLOCK to the watchtower (which signs and broadcasts it) and record it.
+        pair_only=True blocks just the exact (pseudo, MAC) seen on air, not the whole node."""
+        pseudo, mac = self.on_air(node)
         until = now + BLOCK_SECONDS
-        self.blocks[mac] = until
-        self.pending.pop(mac, None)
-        self.send_cmd(make_block_cmd(mac, pseudo, attack, until))
-        self.event(now, "BLOCK", mac, attack, note, evidence)
+        self.blocks[node] = until
+        self.block_target[node] = (pseudo, mac, pair_only)
+        self.pending.pop(node, None)
+        self.send_cmd(make_block_cmd(node, attack, until, pseudo=pseudo, mac=mac, pair_only=pair_only))
+        if pair_only:
+            note += " (only the radio using this identity, not the real node)"
+        self.event(now, "BLOCK", node, attack, note, evidence)
+
+    def unblock(self, node):
+        """Forget a block; returns the (pseudo, mac, pair_only) target it was sent for."""
+        del self.blocks[node]
+        return self.block_target.pop(node, ("", "", False))
 
     def process_commands(self, now):
         """Apply new operator clicks (written by the dashboard) since we last looked."""
@@ -179,30 +244,31 @@ class LiveIPS:
                 cmd = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            mac, action = cmd.get("mac"), cmd.get("action")
-            if action == "block" and mac not in self.blocks:
-                attack, ev = self.pending.get(mac, ("manual", None))   # confirming a pending alert, or a manual block
-                self.block(mac, attack, now, ev, f"blocked by the operator for {BLOCK_SECONDS}s")
-            elif action == "unblock" and mac in self.blocks:
-                del self.blocks[mac]
-                self.send_cmd(make_unblock_cmd(mac))
-                self.event(now, "UNBLOCK", mac, "", "unblocked by the operator")
-            elif action == "dismiss" and mac in self.pending:
-                attack, _ = self.pending.pop(mac)
-                self.dismissed.add(mac)                # don't ask again until this attack stops
-                self.event(now, "DISMISS", mac, attack, "operator dismissed the alert")
+            node, action = cmd.get("node", cmd.get("mac")), cmd.get("action")
+            if action == "block" and node not in self.blocks:
+                # confirming a pending alert (keeps its pair_only choice), or a manual block of the whole node
+                attack, ev, pair_only = self.pending.get(node, ("manual", None, False))
+                self.block(node, attack, now, ev, f"blocked by the operator for {BLOCK_SECONDS}s", pair_only)
+            elif action == "unblock" and node in self.blocks:
+                pseudo, mac, pair_only = self.unblock(node)
+                self.send_cmd(make_unblock_cmd(node, pseudo=pseudo, mac=mac, pair_only=pair_only))
+                self.event(now, "UNBLOCK", node, "", "unblocked by the operator")
+            elif action == "dismiss" and node in self.pending:
+                attack = self.pending.pop(node)[0]
+                self.dismissed.add(node)               # don't ask again until this attack stops
+                self.event(now, "DISMISS", node, attack, "operator dismissed the alert")
 
     def expire_blocks(self, now):
-        for mac, until in list(self.blocks.items()):
+        for node, until in list(self.blocks.items()):
             if now >= until:
-                del self.blocks[mac]
-                self.event(now, "UNBLOCK", mac, "", "block expired")
+                self.unblock(node)
+                self.event(now, "UNBLOCK", node, "", "block expired")
 
-    def event(self, t, kind, mac, attack, note, evidence=None):
-        e = {"t": round(t, 3), "wall": round(t + self.offset, 3), "kind": kind, "mac": mac,
+    def event(self, t, kind, node, attack, note, evidence=None):
+        e = {"t": round(t, 3), "wall": round(t + self.offset, 3), "kind": kind, "node": node,
              "attack": attack, "note": note, "evidence": evidence}
         extra = f"  ({evidence['conf']:.0%} sure)" if evidence else ""
-        print(f"[{kind:7}] {mac}  {attack:8} {note}{extra}")
+        print(f"[{kind:7}] {node}  {attack:8} {note}{extra}")
         log_line(EVENTS_LOG, e)
         if evidence:                                   # BLOCK / ALERT -> explain it in the background
             self.explainer.submit(self.write_explanation, e, self.normal_baseline())
@@ -221,7 +287,7 @@ class LiveIPS:
         except Exception as err:                       # the explainer must never crash the IPS
             text, source = f"(no explanation: {err})", "error"
         print(f"  [explain/{source}] {text}")
-        log_line(EXPLAIN_LOG, {"event_t": event["t"], "mac": event["mac"], "text": text, "source": source})
+        log_line(EXPLAIN_LOG, {"event_t": event["t"], "node": event["node"], "text": text, "source": source})
 
 
 def auto_block_enabled():

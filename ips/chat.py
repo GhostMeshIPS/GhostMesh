@@ -35,7 +35,7 @@ GLOSSARY = """\
 - Rule baseline: a simple "more than 15 packets per second = attack" check, shown for comparison.
 - Isolation Forest: a second AI model that flags anything unusual without knowing attack types.
 - BLOCK: a signed command telling every node to ignore a radio for 60 seconds. Blocks expire on purpose.
-- MAC rotation: radios change their hardware address every 60 seconds for privacy.
+- MAC rotation: radios change their hardware address every 60 seconds for privacy. The watchtower can still tell which real node (A, B, C, D or X) sent each packet, so the IPS follows a node across rotations.
 - Flooding: a radio sending packets far faster than normal to drown out the mesh.
 - Routing abuse: a radio advertising fake routes (fake TTL, extra HELLOs) so messages flow through it.
 - Replay: a radio re-sending old captured packets.
@@ -45,6 +45,7 @@ PLAYBOOK = """\
 - An unknown radio is flooding or doing routing abuse: nothing to do, the IPS blocks it automatically within ~2 seconds. If it keeps attacking after the 60-second block expires, it is blocked again. To find the device physically, a stronger signal (RSSI closer to 0) means it is closer to the watchtower.
 - One of our own nodes (A, B, C or D) was blocked: it could be a false alarm or a faulty/compromised board. Wait 60 seconds for the block to expire. If it is blocked again, unplug that node and check it (firmware bug causing rapid resends, or tampering). The mesh reroutes around it automatically.
 - Spoofing alert: the IPS deliberately does NOT block, because that would also cut off the real node. Confirm with the real node's owner in person, and watch whether its signal strength suddenly jumps.
+- An attack is waiting for confirmation because the signal is "off this node's usual level": another radio may be using that node's identity. The IPS never blocks a whole node on that kind of evidence by itself. If you click Confirm BLOCK, only the radio using that identity is blocked, not the real node.
 - Replay attack: replayed packets are still encrypted, so the attacker cannot read them. Nodes ignore duplicates. The IPS blocks the replaying radio.
 - A node shows SILENT: it stopped transmitting. Usually unplugged, out of range or out of battery. Messages reroute through the other nodes (e.g. A to C via D instead of B) within about 10 seconds.
 - A message did not arrive (no double tick): the sender retries automatically 3 times (after 1, 2 and 4 seconds). If it still fails, check that a path exists on the mesh map, then resend.
@@ -95,36 +96,36 @@ def live_status(windows, events, status=None):
     if events is not None and not events.empty:
         for _, e in events.sort_values("wall").iterrows():
             if e["kind"] == "BLOCK":
-                active.add(e["mac"])
+                active.add(e["node"])
             elif e["kind"] == "UNBLOCK":
-                active.discard(e["mac"])
+                active.discard(e["node"])
 
     lines.append("Radios heard:")
-    latest = windows.sort_values("wall").groupby("mac").tail(1)
+    latest = windows.sort_values("wall").groupby("node").tail(1)
     for _, r in latest.iterrows():
         ago = now - r["wall"]
-        state = ("BLOCKED" if r["mac"] in active else "silent" if ago > 5
+        state = ("BLOCKED" if r["node"] in active else "silent" if ago > 5
                  else r["pred"] if r["pred"] != "normal" else "normal")
-        lines.append(f"- {display_name(r['mac'])}: {state}, {r['pkt_count']:.0f} packets/s, "
+        lines.append(f"- {display_name(r['node'])}: {state}, {r['pkt_count']:.0f} packets/s, "
                      f"signal {r['rssi_mean']:.0f} dBm, last heard {ago:.0f} s ago.")
     lines.append(f"Active blocks: {', '.join(display_name(m) for m in active) or 'none'}.")
     pending = {}
     if events is not None and not events.empty:
         for _, e in events.sort_values("wall").iterrows():
             if e["kind"] == "PENDING":
-                pending[e["mac"]] = e["attack"]
+                pending[e["node"]] = e["attack"]
             elif e["kind"] in ("BLOCK", "DISMISS"):
-                pending.pop(e["mac"], None)
+                pending.pop(e["node"], None)
     if pending:
         lines.append("Waiting for the operator to click Confirm BLOCK or Dismiss (auto-block is off): "
                      + ", ".join(f"{display_name(m)} ({a})" for m, a in pending.items()) + ".")
     # Pre-sorted rankings, because the model compares numbers badly (especially negative dBm)
     by_signal = latest.sort_values("rssi_mean", ascending=False)
     lines.append("Signal strength ranking, STRONGEST first: "
-                 + ", ".join(f"{display_name(m)} ({v:.0f} dBm)" for m, v in zip(by_signal["mac"], by_signal["rssi_mean"])) + ".")
+                 + ", ".join(f"{display_name(m)} ({v:.0f} dBm)" for m, v in zip(by_signal["node"], by_signal["rssi_mean"])) + ".")
     by_rate = latest.sort_values("pkt_count", ascending=False)
     lines.append("Packet rate ranking, BUSIEST first: "
-                 + ", ".join(f"{display_name(m)} ({v:.0f}/s)" for m, v in zip(by_rate["mac"], by_rate["pkt_count"])) + ".")
+                 + ", ".join(f"{display_name(m)} ({v:.0f}/s)" for m, v in zip(by_rate["node"], by_rate["pkt_count"])) + ".")
 
     if events is not None and not events.empty:
         baseline = windows[windows["pred"] == "normal"][["pkt_count", "hello_count", "ttl_max", "hop_min",
@@ -133,12 +134,12 @@ def live_status(windows, events, status=None):
         blocks = events[events["kind"].isin(["BLOCK", "ALERT"])].sort_values("wall")
         if not blocks.empty:
             for label, b in (("FIRST", blocks.iloc[0]), ("MOST RECENT", blocks.iloc[-1])):
-                lines.append(f"{label} block/alert: {b['kind']} {display_name(b['mac'])} at {clock(b['wall'])} "
+                lines.append(f"{label} block/alert: {b['kind']} {display_name(b['node'])} at {clock(b['wall'])} "
                              f"for {ATTACK_TEXT.get(b['attack'], b['attack']).split(':')[0]}.")
             lines.append(f"Total blocks/alerts so far: {len(blocks)}.")
         lines.append("Recent IPS actions (NEWEST FIRST):")
         for _, e in events.sort_values("wall", ascending=False).head(6).iterrows():
-            who = display_name(e["mac"])
+            who = display_name(e["node"])
             if e["kind"] == "UNBLOCK":
                 lines.append(f"- {clock(e['wall'])}: block on {who} expired.")
                 continue

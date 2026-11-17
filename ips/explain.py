@@ -18,11 +18,9 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/generate")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:3b")
 TIMEOUT_S = 60
 
-# Friendly names for the demo boards (real MACs rotate every 60 s, so unknown ones fall back)
-NODE_NAMES = {
-    "02:00:00:00:00:0A": "Node A", "02:00:00:00:00:0B": "Node B",
-    "02:00:00:00:00:0C": "Node C", "02:00:00:00:00:0D": "Node D",
-}
+# Friendly names, keyed by the watchtower's `node` letter (stable across MAC rotation).
+# Anything else is a MAC: a radio the watchtower couldn't match to a real node ("?").
+NODE_NAMES = {"A": "Node A", "B": "Node B", "C": "Node C", "D": "Node D", "X": "Node X"}
 
 # Our own fixed wording for each attack (never taken from packets)
 ATTACK_TEXT = {
@@ -44,8 +42,9 @@ EVIDENCE = {
 }
 
 
-def display_name(mac):
-    return NODE_NAMES.get(mac, f"Unknown ·{mac[-5:]}")
+def display_name(node):
+    """'Node A', or 'Unknown ·ab:cd' (last bytes of its MAC) for an unmatched radio."""
+    return NODE_NAMES.get(node, f"Unknown ·{str(node)[-5:]}")
 
 
 def top_evidence(features, baseline, top=3):
@@ -67,10 +66,9 @@ def build_facts(event, baseline, block_seconds):
     """Turn an IPS event into a small, SAFE set of facts for the LLM.
     Only our own labels and numbers: the attacker can't put words in here."""
     ev = event["evidence"]
-    mac = event["mac"]
     return {
         "action": "blocked" if event["kind"] == "BLOCK" else "raised an alert about",
-        "who": NODE_NAMES.get(mac, "an unknown radio"),        # never the raw pseudonym
+        "who": NODE_NAMES.get(event["node"], "an unknown radio"),   # never the raw pseudonym or MAC
         "attack": ATTACK_TEXT.get(event["attack"], "suspicious behaviour"),
         "evidence": [f"{label} was {x} (normal is {base})"
                      for label, x, base in top_evidence(ev["features"], baseline)],

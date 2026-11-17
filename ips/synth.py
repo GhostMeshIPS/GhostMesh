@@ -1,25 +1,26 @@
+import hashlib
 import json
 import random
-import uuid
 
 random.seed(42)          # same "random" output each run, which makes debugging easier
 
 DURATION = 300           # seconds of simulated traffic
 HELLO_PERIOD = 2.0       # nodes beacon every ~2 s
 JITTER = 0.2             # +/- random wobble on each beacon interval
-START_T = 1731264000.0   # fake Unix timestamp for t=0
+START_T = 1731264000.0   # fake Unix timestamp for t=0 (a whole minute, like a real epoch start)
+EPOCH = 60               # every node changes pseudonym AND MAC on each Unix minute boundary
 
-# Each node: a MAC, a pseudonym, and its average signal strength at the watchtower.
+# Each real node and its average signal strength at the watchtower (dBm).
 NODES = {
-    "02:00:00:00:00:0A": {"pseudo": "a1b2c3d4", "rssi_mean": -48},  # close
-    "02:00:00:00:00:0B": {"pseudo": "b2c3d4e5", "rssi_mean": -60},
-    "02:00:00:00:00:0C": {"pseudo": "c3d4e5f6", "rssi_mean": -67},
-    "02:00:00:00:00:0D": {"pseudo": "d4e5f6a7", "rssi_mean": -75},  # far
+    "A": -48,   # close
+    "B": -60,
+    "C": -67,
+    "D": -75,   # far
 }
 
-# Attacker: who it is and when/how hard it floods.
-ATTACKER_MAC = "02:00:00:00:00:EE"
-ATTACKER_INFO = {"pseudo": "eeeeeeee", "rssi_mean": -55}
+# Attacker board: node "X" (the watchtower knows it like any keyed insider).
+ATTACKER = "X"
+ATTACKER_RSSI = -55
 FLOOD_START, FLOOD_END = 120, 150   # seconds into the session
 FLOOD_RATE = 30                     # packets per second (normal node: ~0.5/s)
 SLOW_FLOOD_RATE = 8                 # under the rule's threshold of 15, but still ~16x normal
@@ -30,17 +31,36 @@ ROUTING_FAKE_TTL = 10               # honest HELLOs use TTL 1
 ATTACK_LEN = 30                     # seconds each attack lasts in the train/test sessions
 
 
-def make_packet(t, mac, info, ptype="HELLO", ttl=1, label="normal"):
+def identity(node, t):
+    """This node's pseudonym and MAC during the epoch containing time t.
+
+    A simplified copy of Jose's scheme (PROTOCOL.md 9.3): both come from a hash of the
+    node's secret and the epoch number, so they change every minute and look random to
+    an outsider. Here the "secret" is just the node letter (fine for fake data).
+    """
+    epoch = int(t // EPOCH)
+    h = hashlib.blake2b(f"{node}-{epoch}".encode(), digest_size=10).digest()
+    pseudo = h[:4].hex()
+    mac = bytearray(h[4:10])
+    mac[0] = (mac[0] & 0xFC) | 0x02          # "locally administered" MAC, like the real boards
+    return pseudo, ":".join(f"{b:02x}" for b in mac)
+
+
+def make_packet(t, node, rssi_mean, ptype="HELLO", ttl=1, label="normal"):
     """Build one log line (as a dict) in the watchtower schema."""
+    pseudo, mac = identity(node, t)
     return {
         "t": round(t, 3),
-        "mac": mac,
-        "pseudo": info["pseudo"],
+        "mac": mac,                # rotates every minute...
+        "pseudo": pseudo,          # ...and so does this
+        "node": node,              # added by the watchtower; does NOT rotate
         "type": ptype,
-        "msg_id": uuid.uuid4().hex[:8],
+        # 8 random bytes, like the real frame's msg_id. Uses `random` (not uuid) so the seed
+        # controls it too: same seed -> byte-identical files.
+        "msg_id": f"{random.getrandbits(64):016x}",
         "ttl": ttl,   # HELLOs use 1 (direct neighbours only); DATA can travel further
         "hop": 0,     # heard straight from the sender, not relayed
-        "rssi": round(info["rssi_mean"] + random.gauss(0, 2)),
+        "rssi": round(rssi_mean + random.gauss(0, 2)),
         "len": 240,
         "link_ok": True,
         "label": label,
@@ -49,10 +69,10 @@ def make_packet(t, mac, info, ptype="HELLO", ttl=1, label="normal"):
 
 def simulate():
     packets = []
-    for mac, info in NODES.items():
+    for node, rssi_mean in NODES.items():
         t = random.uniform(0, HELLO_PERIOD)          # random start so nodes aren't in sync
         while t < DURATION:
-            packets.append(make_packet(START_T + t, mac, info))
+            packets.append(make_packet(START_T + t, node, rssi_mean))
             t += HELLO_PERIOD + random.uniform(-JITTER, JITTER)
     return sorted(packets, key=lambda p: p["t"])     # interleave nodes by time
 
@@ -62,7 +82,7 @@ def simulate_flood(rate=FLOOD_RATE, start=FLOOD_START, end=FLOOD_END):
     packets = []
     t = start
     while t < end:
-        packets.append(make_packet(START_T + t, ATTACKER_MAC, ATTACKER_INFO,
+        packets.append(make_packet(START_T + t, ATTACKER, ATTACKER_RSSI,
                                    ptype="DATA", ttl=4, label="flood"))
         t += 1 / rate                                # 30/s -> 0.033 s gaps, 8/s -> 0.125 s
     return packets
@@ -74,7 +94,7 @@ def simulate_routing(start, end, rate=ROUTING_RATE):
     packets = []
     t = start
     while t < end:
-        packets.append(make_packet(START_T + t, ATTACKER_MAC, ATTACKER_INFO,
+        packets.append(make_packet(START_T + t, ATTACKER, ATTACKER_RSSI,
                                    ptype="HELLO", ttl=ROUTING_FAKE_TTL, label="routing"))
         t += 1 / rate                                # 5/s -> 0.2 s gaps
     return packets

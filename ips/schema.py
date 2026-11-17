@@ -10,7 +10,7 @@ import json
 FIELD_MAP = {
     "t": "t",              # timestamp, seconds (float)
     "mac": "mac",          # transmitter's MAC (rotates every 60 s)
-    "pseudo": "pseudo",    # sender pseudonym (rotates every 60 s)
+    "pseudo": "pseudo",    # TRANSMITTER's pseudonym, i.e. the last hop, not the originator (rotates every 60 s)
     "type": "type",        # DATA / ACK / HELLO / RREQ / RREP / BLOCK
     "msg_id": "msg_id",
     "ttl": "ttl",
@@ -27,6 +27,16 @@ FIELD_TYPES = {
 }
 
 PACKET_TYPES = {"DATA", "ACK", "HELLO", "RREQ", "RREP", "BLOCK"}
+
+# Optional fields: kept when present, never required (older logs and the sim may not have them).
+# node: the REAL node behind the transmitter, worked out by the watchtower from its pseudonym
+#       secrets. "A"-"D" = our nodes, "X" = attacker board, "W" = watchtower itself,
+#       "?" = a pseudonym that matches no real node (an outsider, or a forged identity).
+#       Unlike mac/pseudo it does NOT rotate, so the IPS can follow a node across rotations.
+OPTIONAL_TYPES = {"node": str}
+NODE_IDS = {"A", "B", "C", "D", "W", "X"}
+UNKNOWN_NODE = "?"
+WATCHTOWER = "W"
 
 # Only present in synthetic / labeled data; live watchtower data has no label
 LABEL_FIELD = "label"
@@ -64,20 +74,43 @@ def parse_line(line):
 
     if pkt["type"] not in PACKET_TYPES:
         return None
+    for name, cast in OPTIONAL_TYPES.items():         # optional: keep if present and valid
+        if raw.get(name) is not None:
+            try:
+                pkt[name] = cast(raw[name])
+            except (TypeError, ValueError):
+                pass                                  # a bad optional field doesn't sink the packet
     if LABEL_FIELD in raw:                            # keep ground truth when it exists
         pkt["label"] = raw[LABEL_FIELD]
     return pkt
 
 
-def make_block_cmd(mac, pseudo, reason, until):
-    """The command the IPS sends to the watchtower, which signs and broadcasts it."""
-    return {"cmd": "block", "mac": mac, "pseudo": pseudo,
+def _target(node, pseudo, mac, pair_only):
+    """Who a block/unblock is aimed at (Jose's format, design decision 8b).
+
+    Known node ("A".."X"): just name it. The watchtower works out that node's pseudonym + MAC
+    for every epoch and re-issues the BLOCK each minute, so the block survives rotation.
+    Unknown node, or pair_only=True: name the exact (pseudo, mac) seen on air. Nodes drop
+    frames matching BOTH, so a spoofer using a victim's pseudonym from its own MAC is blocked
+    without cutting off the victim (open issue O9). This kind lasts until the next rotation.
+    """
+    if node in NODE_IDS and not pair_only:
+        return {"node": node}
+    return {"node": UNKNOWN_NODE, "pseudo": pseudo, "mac": mac}
+
+
+def make_block_cmd(node, reason, until, pseudo="", mac="", pair_only=False):
+    """The command the IPS sends to the watchtower, which signs and broadcasts it.
+    e.g. {"cmd":"block","node":"X","reason":"flood","until":1731264300.0}"""
+    return {"cmd": "block", **_target(node, pseudo, mac, pair_only),
             "reason": reason, "until": round(until, 3)}
 
 
-def make_unblock_cmd(mac):
-    """Lift a block early (operator clicked Unblock). Blocks also expire on their own via `until`."""
-    return {"cmd": "unblock", "mac": mac}
+def make_unblock_cmd(node, pseudo="", mac="", pair_only=False):
+    """Lift a block early (operator clicked Unblock). Blocks also expire on their own via `until`.
+    PROVISIONAL: Jose proposes unblocking by a `block_id` the watchtower echoes back; the exact
+    format is Yunus's call (PROTOCOL.md serial section). Until then we name the same target."""
+    return {"cmd": "unblock", **_target(node, pseudo, mac, pair_only)}
 
 
 def encode_cmd(cmd):

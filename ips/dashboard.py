@@ -14,7 +14,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from detect import BENCH_PATH
-from explain import EVIDENCE, NODE_NAMES, OLLAMA_MODEL, display_name, top_evidence
+from explain import EVIDENCE, OLLAMA_MODEL, display_name, top_evidence
 import chat
 from live import (BLOCK_SECONDS, COMMANDS_LOG, CONFIRM_WINDOWS, EVENTS_LOG, EXPLAIN_LOG, MODE_PATH,
                   STATUS_PATH, WINDOWS_LOG)
@@ -117,12 +117,18 @@ def read_log(path):
     if not os.path.exists(path) or os.path.getsize(path) == 0:
         return pd.DataFrame()
     try:
-        return pd.read_json(path, lines=True)
+        df = pd.read_json(path, lines=True, dtype={"node": str})   # "A", not a number or NaN guess
     except ValueError:
         return pd.DataFrame()            # caught a half-written last line; next refresh is fine
+    if "node" not in df.columns and "mac" in df.columns:
+        df["node"] = df["mac"]           # a log written before the switch to `node`
+    return df
 
 
-name = display_name   # "Node A", or "Unknown ·00:EE" for radios we don't recognise
+def name(node):
+    """'Node A', or 'Unknown ·ab:cd' for radios we don't recognise. HTML-escaped, because an
+    unmatched radio's name comes from its MAC, which an attacker controls."""
+    return html.escape(display_name(node))
 
 
 def clock(wall):
@@ -135,11 +141,11 @@ def ago(seconds):
     return "just now" if seconds < 2 else f"{seconds} s ago" if seconds < 120 else f"{seconds // 60} min ago"
 
 
-def send_command(action, mac):
+def send_command(action, node):
     """Operator click -> data/operator_commands.jsonl. live.py applies it within ~1 second."""
     os.makedirs("data", exist_ok=True)
     with open(COMMANDS_LOG, "a") as f:
-        f.write(json.dumps({"ts": time.time(), "action": action, "mac": mac}) + "\n")
+        f.write(json.dumps({"ts": time.time(), "action": action, "node": node}) + "\n")
 
 
 def read_auto_block():
@@ -173,7 +179,7 @@ def time_to_block(windows, events):
     """For each BLOCK: seconds between the attacker's first flagged window and the BLOCK."""
     delays = []
     for _, b in events[events["kind"] == "BLOCK"].iterrows():
-        flagged = windows[(windows["mac"] == b["mac"]) & (windows["pred"] != "normal")
+        flagged = windows[(windows["node"] == b["node"]) & (windows["pred"] != "normal")
                           & (windows["t"] <= b["t"]) & (windows["t"] >= b["t"] - 10)]
         if not flagged.empty:
             delays.append(b["t"] - flagged["t"].min())
@@ -182,7 +188,7 @@ def time_to_block(windows, events):
 
 def status(row, active, now):
     """One transmitter's current state -> (label, colour, css pill class)."""
-    if row["mac"] in active:
+    if row["node"] in active:
         return "BLOCKED", RED, "pill-blocked"
     if now - row["t"] > 5:
         return "SILENT", GREY, "pill-silent"
@@ -206,15 +212,16 @@ def badge(text, ok):
 MAP_POS = {"Node A": (0, 0.5), "Node B": (1, 1), "Node C": (2, 0.5), "Node D": (1, 0),
            "Watchtower": (1, 0.5)}
 MESH_LINKS = [("Node A", "Node B"), ("Node B", "Node C"), ("Node A", "Node D"), ("Node D", "Node C")]
+MESH_NODES = ["A", "B", "C", "D"]     # the boards with a fixed spot on the map
 
 
 def mesh_map(latest, active, now):
     fig = go.Figure()
     pos = dict(MAP_POS)
-    # Unknown transmitters (attackers, rotated MACs) get slots on the right-hand side
-    unknown = [m for m in latest["mac"] if m not in NODE_NAMES]
-    for i, mac in enumerate(unknown):
-        pos[name(mac)] = (2.8, 0.9 - i * 0.4)
+    # Everything else (node X, radios the watchtower couldn't match) gets a slot on the right
+    unknown = [m for m in latest["node"] if m not in MESH_NODES]
+    for i, node in enumerate(unknown):
+        pos[name(node)] = (2.8, 0.9 - i * 0.4)
 
     def line(a, b, **style):
         (x0, y0), (x1, y1) = pos[a], pos[b]
@@ -222,16 +229,16 @@ def mesh_map(latest, active, now):
 
     for a, b in MESH_LINKS:                                    # radio links between boards
         line(a, b, color="#3B4A8C", width=3)
-    for n in list(NODE_NAMES.values()) + [name(m) for m in unknown]:   # watchtower hears everyone
+    for n in [name(m) for m in MESH_NODES + unknown]:          # watchtower hears everyone
         line("Watchtower", n, color="#2A3770", width=1, dash="dot")
 
     xs, ys, colors, labels, hovers, tags = [], [], [], [], [], []
     for _, r in latest.iterrows():
         label, color, _ = status(r, active, now)
-        n = name(r["mac"])
+        n = name(r["node"])
         xs.append(pos[n][0]); ys.append(pos[n][1]); colors.append(color)
         labels.append(f"<b>{n}</b><br>{r['pkt_count']:.0f} pkt/s")
-        hovers.append(f"{n} · {r['mac']}<br>{label} · {r['pkt_count']:.0f} pkt/s · {r['rssi_mean']:.0f} dBm")
+        hovers.append(f"{n} · MAC now {html.escape(str(r.get('mac', '')))}<br>{label} · {r['pkt_count']:.0f} pkt/s · {r['rssi_mean']:.0f} dBm")
         tags.append("🚫" if label == "BLOCKED" else "")
     fig.add_scatter(x=xs, y=ys, mode="markers+text", text=labels, textposition="bottom center",
                     hovertext=hovers, hoverinfo="text", showlegend=False, textfont=dict(color=INK, size=11),
@@ -354,44 +361,44 @@ def live_view():
     head_r.markdown(f'<div style="text-align:right;padding-top:22px">{badge_html}</div>', unsafe_allow_html=True)
 
     # Blocks active right now = BLOCK events whose expiry is still in the future
-    active, pending = set(), {}               # pending: mac -> attack waiting for the operator
+    active, pending = set(), {}               # pending: node -> attack waiting for the operator
     if not events.empty:
         for _, e in events.iterrows():
             if e["kind"] == "BLOCK":
-                active.add(e["mac"])
-                pending.pop(e["mac"], None)
+                active.add(e["node"])
+                pending.pop(e["node"], None)
             elif e["kind"] == "UNBLOCK":
-                active.discard(e["mac"])
+                active.discard(e["node"])
             elif e["kind"] == "PENDING":
-                pending[e["mac"]] = e["attack"]
+                pending[e["node"]] = e["attack"]
             elif e["kind"] == "DISMISS":
-                pending.pop(e["mac"], None)
+                pending.pop(e["node"], None)
 
     # ---- KPI row
     n_attacks = 0 if events.empty else int((events["kind"] == "BLOCK").sum() + (events["kind"] == "ALERT").sum())
     ttb = None if events.empty else time_to_block(windows, events)
     k1, k2, k3, k4 = st.columns(4)
     k1.markdown(kpi("📡", "rgba(59,91,253,.20)", "Packets analysed", f"{int(windows['pkt_count'].sum()):,}"), unsafe_allow_html=True)
-    k2.markdown(kpi("🛰️", "rgba(44,217,197,.15)", "Transmitters seen", windows["mac"].nunique()), unsafe_allow_html=True)
+    k2.markdown(kpi("🛰️", "rgba(44,217,197,.15)", "Transmitters seen", windows["node"].nunique()), unsafe_allow_html=True)
     k3.markdown(kpi("🛡️", "rgba(255,91,110,.15)", "Attacks stopped", n_attacks), unsafe_allow_html=True)
     k4.markdown(kpi("⏱️", "rgba(255,181,71,.15)", "Avg. time to block", f"{ttb:.0f} s" if ttb is not None else "–"),
                 unsafe_allow_html=True)
     st.write("")
 
     # ---- confirm-click mode: attacks waiting for the operator's decision
-    for mac, attack in pending.items():
-        with st.container(key=f"card_pending_{mac.replace(':', '')}"):
+    for node, attack in pending.items():
+        with st.container(key=f"card_pending_{node.replace(':', '')}"):
             msg, b1, b2 = st.columns([4, 1, 1], vertical_alignment="center")
             title = ATTACKS.get(attack, (attack,))[0]
-            msg.markdown(f'<div class="card-title">⏳ {name(mac)} looks like <span style="color:{RED}">{title}</span>'
+            msg.markdown(f'<div class="card-title">⏳ {name(node)} looks like <span style="color:{RED}">{title}</span>'
                          f'</div><div class="card-sub">The AI detected this while Auto-block was off, so it is waiting for your decision. '
                          f'See the Activity feed for its evidence.</div>', unsafe_allow_html=True)
-            if b1.button("Confirm BLOCK", key=f"confirm_{mac}", type="primary", width="stretch"):
-                send_command("block", mac)
-                st.toast(f"BLOCK sent for {name(mac)}")
-            if b2.button("Dismiss", key=f"dismiss_{mac}", width="stretch"):
-                send_command("dismiss", mac)
-                st.toast(f"Alert on {name(mac)} dismissed")
+            if b1.button("Confirm BLOCK", key=f"confirm_{node}", type="primary", width="stretch"):
+                send_command("block", node)
+                st.toast(f"BLOCK sent for {name(node)}")
+            if b2.button("Dismiss", key=f"dismiss_{node}", width="stretch"):
+                send_command("dismiss", node)
+                st.toast(f"Alert on {name(node)} dismissed")
         st.write("")
 
     # ---- traffic chart: packets per second, split by what the model said
@@ -414,11 +421,11 @@ def live_view():
         # shade the time each block was active
         if not events.empty:
             for _, b in events[events["kind"] == "BLOCK"].iterrows():
-                end = events[(events["kind"] == "UNBLOCK") & (events["mac"] == b["mac"]) & (events["t"] > b["t"])]
+                end = events[(events["kind"] == "UNBLOCK") & (events["node"] == b["node"]) & (events["t"] > b["t"])]
                 x1 = end["wall"].min() if not end.empty else wall_now
                 fig.add_vrect(x0=datetime.fromtimestamp(b["wall"]), x1=datetime.fromtimestamp(x1),
                               fillcolor=RED, opacity=0.06, line_width=0,
-                              annotation_text=f"🚫 {name(b['mac'])} blocked", annotation_position="top left",
+                              annotation_text=f"🚫 {name(b['node'])} blocked", annotation_position="top left",
                               annotation_font=dict(size=11, color=RED))
         fig.update_layout(barmode="stack", bargap=0.25, barcornerradius=3, height=320,
                           margin=dict(l=0, r=0, t=10, b=0), plot_bgcolor="#111C44", paper_bgcolor="#111C44",
@@ -438,7 +445,7 @@ def live_view():
 
         def line_chart(col, y_title, extra=None, smooth=1):
             fig = go.Figure()
-            for mac, g in recent.sort_values("time").groupby("mac"):
+            for node, g in recent.sort_values("time").groupby("node"):
                 # Radios the AI ever flagged are drawn bold; normal ones faded, so attacks stand out
                 flagged = (g["pred"] != "normal").any()
                 y = g[col].rolling(smooth, min_periods=1).mean()     # smooth=5 -> 5-second average
@@ -449,9 +456,9 @@ def live_view():
                 for i in reversed(gaps):
                     x.insert(i, x[i - 1])
                     y.insert(i, None)
-                fig.add_scatter(x=x, y=y, mode="lines", name=name(mac), connectgaps=False,
+                fig.add_scatter(x=x, y=y, mode="lines", name=name(node), connectgaps=False,
                                 line=dict(width=3 if flagged else 1.5), opacity=1 if flagged else 0.55,
-                                hovertemplate=f"{name(mac)}: %{{y:.2f}} at %{{x|%-I:%M:%S %p}}<extra></extra>")
+                                hovertemplate=f"{name(node)}: %{{y:.2f}} at %{{x|%-I:%M:%S %p}}<extra></extra>")
             if extra:
                 extra(fig)
             fig.update_layout(height=260, margin=dict(l=0, r=0, t=10, b=0), plot_bgcolor="#111C44",
@@ -482,7 +489,7 @@ def live_view():
                         '</div>', unsafe_allow_html=True)
     st.write("")
 
-    latest = windows.sort_values("t").groupby("mac").tail(1).sort_values("mac")   # newest window per radio
+    latest = windows.sort_values("t").groupby("node").tail(1).sort_values("node")   # newest window per radio
 
     map_col, cmp_col = st.columns([1.25, 1])
 
@@ -540,17 +547,18 @@ def live_view():
             pill = f'<span class="pill {css}">{label}</span>'
             seen = ago(now - r["t"])
             info, btn = st.columns([3.3, 1], vertical_alignment="center")
-            info.markdown(f'<div class="tx"><div><div class="tx-name">{name(r["mac"])} &nbsp;{pill}</div>'
-                          f'<div class="tx-meta">{r["mac"]} · {r["pkt_count"]:.0f} pkts/s · '
+            info.markdown(f'<div class="tx"><div><div class="tx-name">{name(r["node"])} &nbsp;{pill}</div>'
+                          f'<div class="tx-meta">MAC now {html.escape(str(r.get("mac", "")))} (rotates) · '
+                          f'{r["pkt_count"]:.0f} pkts/s · '
                           f'{r["rssi_mean"]:.0f} dBm · seen {seen}</div></div></div>', unsafe_allow_html=True)
             # Manual override: the operator can always block or lift a block by hand
-            if r["mac"] in active:
-                if btn.button("Unblock", key=f"unblock_{r['mac']}", width="stretch"):
-                    send_command("unblock", r["mac"])
-                    st.toast(f"Unblocking {name(r['mac'])}")
-            elif btn.button("Block", key=f"block_{r['mac']}", width="stretch"):
-                send_command("block", r["mac"])
-                st.toast(f"BLOCK sent for {name(r['mac'])}")
+            if r["node"] in active:
+                if btn.button("Unblock", key=f"unblock_{r['node']}", width="stretch"):
+                    send_command("unblock", r["node"])
+                    st.toast(f"Unblocking {name(r['node'])}")
+            elif btn.button("Block", key=f"block_{r['node']}", width="stretch"):
+                send_command("block", r["node"])
+                st.toast(f"BLOCK sent for {name(r['node'])}")
 
     # ---- traffic mix donut
     with mid, st.container(key="card_mix"):
@@ -580,10 +588,10 @@ def live_view():
             # "Normal" reference values = median of every window the AI called normal
             baseline = windows[windows["pred"] == "normal"][list(EVIDENCE)].median().to_dict()
 
-            # LLM summaries arrive a few seconds after their event; match them by (time, mac)
+            # LLM summaries arrive a few seconds after their event; match them by (time, node)
             explanations = read_log(EXPLAIN_LOG)
             summaries = {} if explanations.empty else {
-                (round(r["event_t"], 3), r["mac"]): (r["text"], r["source"]) for _, r in explanations.iterrows()}
+                (round(r["event_t"], 3), r["node"]): (r["text"], r["source"]) for _, r in explanations.iterrows()}
 
             def why_html(e):
                 """LLM summary (or the evidence line) + detector badges for a BLOCK/ALERT event."""
@@ -596,7 +604,7 @@ def live_view():
                     badges += badge("Isolation Forest: " + ("caught" if ev["iforest_caught"] else "missed"),
                                     ev["iforest_caught"])
 
-                summary = summaries.get((round(e["t"], 3), e["mac"]))
+                summary = summaries.get((round(e["t"], 3), e["node"]))
                 if summary and summary[1] not in ("template", "error"):
                     # Written by the local LLM. Escaped, since it's model output, not our own HTML.
                     box = (f'<div class="why llm">🤖 {html.escape(summary[0])}'
@@ -614,24 +622,24 @@ def live_view():
                 if e["kind"] == "BLOCK":
                     title, why = ATTACKS.get(e["attack"], (e["attack"], ""))
                     by_you = " (by you)" if "operator" in str(e["note"]) and e["attack"] != "manual" else ""
-                    items.append(("🚫", "rgba(255,91,110,.15)", f"Blocked {name(e['mac'])}: {title}{by_you}",
+                    items.append(("🚫", "rgba(255,91,110,.15)", f"Blocked {name(e['node'])}: {title}{by_you}",
                                   f"{when} · {why}. BLOCK sent to watchtower for {BLOCK_SECONDS} s." + why_html(e)))
                 elif e["kind"] == "UNBLOCK" and "operator" in str(e["note"]):
-                    items.append(("🔓", "#1F2A5C", f"{name(e['mac'])} unblocked by you", f"{when} · manual override"))
+                    items.append(("🔓", "#1F2A5C", f"{name(e['node'])} unblocked by you", f"{when} · manual override"))
                 elif e["kind"] == "UNBLOCK":
-                    items.append(("🔓", "#1F2A5C", f"Block on {name(e['mac'])} expired",
+                    items.append(("🔓", "#1F2A5C", f"Block on {name(e['node'])} expired",
                                   f"{when} · blocks are temporary, so a wrongly blocked node is never cut off for good"))
                 elif e["kind"] == "PENDING":
                     title, why = ATTACKS.get(e["attack"], (e["attack"], ""))
-                    items.append(("⏳", "rgba(255,181,71,.15)", f"Waiting for you: {name(e['mac'])}, {title}",
+                    items.append(("⏳", "rgba(255,181,71,.15)", f"Waiting for you: {name(e['node'])}, {title}",
                                   f"{when} · {why}. Auto-block is off, so the IPS asked before blocking."
                                   + why_html(e)))
                 elif e["kind"] == "DISMISS":
-                    items.append(("✋", "#1F2A5C", f"You dismissed the alert on {name(e['mac'])}",
+                    items.append(("✋", "#1F2A5C", f"You dismissed the alert on {name(e['node'])}",
                                   f"{when} · no BLOCK sent; the IPS won't ask again until this attack stops"))
                 else:
                     title, why = ATTACKS.get(e["attack"], (e["attack"], ""))
-                    items.append(("⚠️", "rgba(255,181,71,.15)", f"Alert: {name(e['mac'])}, {title}",
+                    items.append(("⚠️", "rgba(255,181,71,.15)", f"Alert: {name(e['node'])}, {title}",
                                   f"{when} · {e['note']}" + why_html(e)))
             st.markdown("".join(
                 f'<div class="ev"><div class="ev-dot" style="background:{bg}">{icon}</div>'
