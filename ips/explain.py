@@ -31,14 +31,19 @@ ATTACK_TEXT = {
     "spoof":   "spoofing: pretending to be another node",
 }
 
-# Features that make good evidence, with plain-English names and formats
+# Features that make good evidence: plain-English name, number format, and which direction is
+# SUSPICIOUS ("up" = higher than normal is bad, "down" = lower is bad). Only a change in the
+# suspicious direction counts as evidence: "fewer HELLOs than normal" doesn't incriminate anyone.
 EVIDENCE = {
-    "pkt_count":   ("packets/s",           "{:.0f}"),
-    "hello_count": ("HELLOs/s",            "{:.0f}"),
-    "ttl_max":     ("TTL",                 "{:.0f}"),
-    "hop_min":     ("hop count",           "{:.0f}"),
-    "gap_mean":    ("gap between packets", "{:.2f} s"),
-    "link_fail":   ("failed link checks",  "{:.0f}"),
+    "pkt_count":    ("packets/s",                    "{:.0f}",   "up"),
+    "orig_count":   ("new messages started/s",       "{:.0f}",   "up"),
+    "hello_count":  ("HELLOs/s",                     "{:.0f}",   "up"),
+    "ttl_max":      ("TTL",                          "{:.0f}",   "up"),
+    "hop_min":      ("hop count",                    "{:.0f}",   "down"),
+    "gap_mean":     ("gap between packets",          "{:.2f} s", "down"),
+    "link_fail":    ("failed link checks",           "{:.0f}",   "up"),
+    "stale_count":  ("old messages re-sent/s",       "{:.0f}",   "up"),
+    "dup_tx_count": ("its own messages repeated/s",  "{:.0f}",   "up"),
 }
 
 
@@ -51,10 +56,12 @@ def top_evidence(features, baseline, top=3):
     """The `top` features that differ most from normal -> [(label, value_text, normal_text)].
     'Differ most' = biggest ratio between the attacker's value and the normal median."""
     scored = []
-    for f, (label, fmt) in EVIDENCE.items():
+    for f, (label, fmt, bad_dir) in EVIDENCE.items():
         x, base = features.get(f), baseline.get(f)
         if x is None or base is None:
             continue
+        if (x > base) != (bad_dir == "up"):
+            continue                                            # changed, but in the harmless direction
         ratio = (max(x, base) + 0.1) / (min(x, base) + 0.1)    # +0.1 so zeros don't divide by zero
         if ratio > 1.5:
             scored.append((ratio, label, fmt.format(x), fmt.format(base)))

@@ -505,7 +505,7 @@ def live_view():
     with cmp_col, st.container(key="card_compare"):
         st.markdown('<div class="card-title">Rule vs. AI</div>'
                     '<div class="card-sub">Scored on a session none of the models trained on '
-                    '(slow flood + routing abuse)</div>', unsafe_allow_html=True)
+                    '(slow flood, routing abuse, replay, node B unplugged)</div>', unsafe_allow_html=True)
         if os.path.exists(BENCH_PATH):
             with open(BENCH_PATH) as f:
                 bench = json.load(f)

@@ -26,7 +26,11 @@ FIELD_TYPES = {
     "ttl": int, "hop": int, "rssi": int, "len": int, "link_ok": bool,
 }
 
-PACKET_TYPES = {"DATA", "ACK", "HELLO", "RREQ", "RREP", "BLOCK"}
+# Accept BOTH proposals until the team decides (an unknown type makes parse_line drop the packet):
+#   Rashad's routing code: DATA, ACK, HELLO, BLOCK
+#   Jose's security design: DATA, HELLO, CTRL (signed BLOCK + TIME beacon), KEYS; ACKs are sent as DATA
+# RREQ / RREP were dropped from the protocol on Nov 14.
+PACKET_TYPES = {"DATA", "ACK", "HELLO", "BLOCK", "CTRL", "KEYS"}
 
 # Optional fields: kept when present, never required (older logs and the sim may not have them).
 # node: the REAL node behind the transmitter, worked out by the watchtower from its pseudonym

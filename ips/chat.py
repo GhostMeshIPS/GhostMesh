@@ -14,7 +14,7 @@ import time
 import urllib.request
 from datetime import datetime
 
-from explain import ATTACK_TEXT, OLLAMA_MODEL, display_name, top_evidence
+from explain import ATTACK_TEXT, EVIDENCE, OLLAMA_MODEL, display_name, top_evidence
 from retention import CHAT_MAX_AGE_S, prune_jsonl
 
 CHAT_URL = os.environ.get("OLLAMA_CHAT_URL", "http://localhost:11434/api/chat")
@@ -32,7 +32,8 @@ GLOSSARY = """\
 - Window: the IPS judges each radio once per 1-second slice of time.
 - Random Forest: the AI model that decides normal / flooding / routing abuse / replay / spoofing.
 - Confidence: the share of the Random Forest's 100 decision trees that agreed.
-- Rule baseline: a simple "more than 15 packets per second = attack" check, shown for comparison.
+- Rule baseline: a simple "more than 15 packets per second, or more than 1 HELLO per second = attack" check, shown for comparison.
+- Relay: a node passing someone else's message along. Relays get busy when someone floods, so the IPS looks at who STARTED the messages, not just who transmitted them.
 - Isolation Forest: a second AI model that flags anything unusual without knowing attack types.
 - BLOCK: a signed command telling every node to ignore a radio for 60 seconds. Blocks expire on purpose.
 - MAC rotation: radios change their hardware address every 60 seconds for privacy. The watchtower can still tell which real node (A, B, C, D or X) sent each packet, so the IPS follows a node across rotations.
@@ -128,8 +129,8 @@ def live_status(windows, events, status=None):
                  + ", ".join(f"{display_name(m)} ({v:.0f}/s)" for m, v in zip(by_rate["node"], by_rate["pkt_count"])) + ".")
 
     if events is not None and not events.empty:
-        baseline = windows[windows["pred"] == "normal"][["pkt_count", "hello_count", "ttl_max", "hop_min",
-                                                         "gap_mean", "link_fail"]].median().to_dict()
+        cols = [c for c in EVIDENCE if c in windows.columns]      # same evidence list as the explainer
+        baseline = windows[windows["pred"] == "normal"][cols].median().to_dict()
         # Small models struggle to work out "which is newest", so spell it out
         blocks = events[events["kind"].isin(["BLOCK", "ALERT"])].sort_values("wall")
         if not blocks.empty:

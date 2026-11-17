@@ -19,6 +19,27 @@ def read_file(path):
     return pd.DataFrame(packets)
 
 
+def read_labeled(path):
+    """A recorded session plus its ground truth (datasets/README.md), as a DataFrame with `label`.
+
+    Labels come from `<name>.labels.jsonl` next to the log: one row per attack run,
+    {"label": "flood", "node": "X", "start": ..., "end": ...}. Packets from that node (or tagged
+    "?") inside [start, end] get the label; everything else is "normal". No labels file = all normal.
+    """
+    import json
+    import os
+    df = read_file(path)
+    df["label"] = "normal"
+    labels_path = path[:-len(".jsonl")] + ".labels.jsonl"
+    if os.path.exists(labels_path):
+        with open(labels_path) as f:
+            for row in (json.loads(line) for line in f if line.strip()):
+                who = df["node"].isin([row.get("node", "X"), "?"]) if "node" in df else True
+                in_time = df["t"].between(row["start"], row["end"])
+                df.loc[who & in_time, "label"] = row["label"]
+    return df
+
+
 def replay(path, speed=1.0):
     """Yield packets from a log file, sleeping between them like a live feed.
 

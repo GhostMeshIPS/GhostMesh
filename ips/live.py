@@ -25,7 +25,7 @@ import pandas as pd
 
 from detect import FEATURES, IF_PATH, RF_PATH, iforest_detect, rule_detect, train_rf
 from explain import EVIDENCE, explain
-from features import WINDOW, build_features
+from features import WINDOW, MsgIdTracker, build_features
 from ingest import open_serial, replay, read_file, serial_stream
 from retention import WINDOWS_MAX_AGE_S, prune_jsonl
 from schema import WATCHTOWER, encode_cmd, make_block_cmd, make_unblock_cmd
@@ -60,6 +60,7 @@ class LiveIPS:
         self.iforest = iforest                # Isolation Forest: only logged, for the rule-vs-AI comparison
         self.send_cmd = send_cmd              # function that delivers a BLOCK (print, serial, ...)
         self.buffer = []                      # recent packets
+        self.tracker = MsgIdTracker()         # remembers msg_ids for 3 minutes (replays come late)
         self.current_window = None
         self.streak = defaultdict(int)        # node -> attack windows in a row
         self.streak_rows = defaultdict(list)  # node -> the windows in the current streak (the evidence)
@@ -79,6 +80,9 @@ class LiveIPS:
 
     def feed(self, pkt):
         """Take one packet. When a new second starts, analyse the second that just ended."""
+        # Stamp msg_id history first (relay vs. started it, how old, repeated?), even for the
+        # watchtower's own frames: otherwise the first node relaying a beacon would look like its author.
+        self.tracker.annotate(pkt)
         if pkt["type"] == "BLOCK" or pkt.get("node") == WATCHTOWER:
             return                            # the watchtower's own frames (BLOCKs, time beacons) aren't judged
         # t = the packet's own timeline (used for all the maths);

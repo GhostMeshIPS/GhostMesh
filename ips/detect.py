@@ -5,6 +5,7 @@ import pandas as pd
 from sklearn.ensemble import IsolationForest, RandomForestClassifier
 from sklearn.metrics import classification_report
 from features import build_features   # reuse the Step 3 feature builder
+from ingest import read_file          # reads logs through schema.py, so every field keeps its exact type
 
 # Baseline detector: fixed thresholds a human would write from the protocol spec.
 # Normal nodes send ~1 packet per window, the flood ~30, so 15 sits safely between.
@@ -20,7 +21,10 @@ RULE_NAME = f"Rule (pkts > {RATE_THRESHOLD} or HELLOs > {HELLO_THRESHOLD})"
 #   label       -> the answer; using it would be cheating
 #   pred_*      -> other detectors' outputs
 FEATURES = ["pkt_count", "hello_count", "rssi_mean", "rssi_std",
-            "ttl_max", "hop_min", "gap_mean", "link_fail"]
+            "ttl_max", "hop_min", "gap_mean", "link_fail",
+            "orig_count",     # messages it started itself: separates a flooder from the relays passing it on
+            "stale_count",    # msg_ids first heard > 60 s ago: replay
+            "dup_tx_count"]   # msg_ids it had already sent: replay
 
 RF_PATH = "models/rf.joblib"            # where the trained Random Forest is saved for live.py
 IF_PATH = "models/iforest.joblib"       # trained Isolation Forest (for the rule-vs-AI comparison)
@@ -112,12 +116,12 @@ def flagged_table(feats, pred_col, who):
 if __name__ == "__main__":
     # --- Train the Isolation Forest ONCE, on clean normal traffic only ---
     # Training doesn't depend on which attack file we test, so it stays outside the loop.
-    train_feats = build_features(pd.read_json("normal_session1.jsonl", lines=True))
+    train_feats = build_features(read_file("normal_session1.jsonl"))
     model = train_iforest(train_feats)
 
     # --- Test both detectors on each attack session (data the model has never seen) ---
     for path in ["flood_session1.jsonl", "slowflood_session1.jsonl"]:
-        feats = build_features(pd.read_json(path, lines=True))   # packets -> windows
+        feats = build_features(read_file(path))   # packets -> windows
         y_true = feats["label"] != "normal"                      # True = real attack window
 
         feats["pred_rule"] = rule_detect(feats)                  # threshold baseline
@@ -132,8 +136,8 @@ if __name__ == "__main__":
         print(flagged_table(feats, "pred_iforest", "iforest"))
 
     # --- Step 9: Random Forest — train on one session, test on a DIFFERENT one ---
-    train = build_features(pd.read_json("train_session.jsonl", lines=True))
-    test = build_features(pd.read_json("test_session.jsonl", lines=True))
+    train = build_features(read_file("train_session.jsonl"))
+    test = build_features(read_file("test_session.jsonl"))
     rf = train_rf(train)
     test["pred_rf"] = rf_detect(rf, test)
 
@@ -155,7 +159,7 @@ if __name__ == "__main__":
     joblib.dump(model, IF_PATH)
     print(f"\nsaved Random Forest -> {RF_PATH}, Isolation Forest -> {IF_PATH}")
 
-    # --- Benchmark: all 3 detectors on the SAME unseen test session (slow flood + routing) ---
+    # --- Benchmark: all 3 detectors on the SAME unseen test session (slow flood, routing, replay, B unplugged) ---
     # Attack vs. normal for every detector, so the numbers are directly comparable.
     y_test = test["label"] != "normal"
     bench = {
@@ -163,7 +167,7 @@ if __name__ == "__main__":
         "Isolation Forest": evaluate(y_test, iforest_detect(model, test)),
         "Random Forest": evaluate(y_test, test["pred_rf"] != "normal"),
     }
-    print("\n=== Benchmark on test_session (slow flood + routing abuse) ===")
+    print("\n=== Benchmark on test_session (slow flood, routing abuse, replay, node B unplugged) ===")
     for who, s in bench.items():
         print_scores(who[:8], s)
     with open(BENCH_PATH, "w") as f:
