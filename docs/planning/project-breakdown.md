@@ -103,7 +103,7 @@ Use the RSSI gate + low TX power by default. Keep the allowlist as the "demo mus
 
 | Field | Bytes | Visible to relays? | Purpose |
 |---|---|---|---|
-| `ver_type` | 1 | Yes | Version + type: DATA, ACK, HELLO, RREQ, RREP, BLOCK |
+| `ver_type` | 1 | Yes | Version + type: DATA, ACK, HELLO, BLOCK |
 | `flags` | 1 | Yes | e.g., SOS priority, needs-ACK |
 | `msg_id` | 8 | Yes | **Random** ID (not a counter) used for duplicate suppression |
 | `ttl` | 1 | Yes | Remaining hops; drop at 0 |
@@ -130,7 +130,7 @@ Use the RSSI gate + low TX power by default. Keep the allowlist as the "demo mus
 | 3 | Add `msg_id` to the cache. Try to decrypt; if it succeeds, the message is for us: deliver to serial and send an ACK |
 | 4 | If `ttl == 0`, stop |
 | 5 | Otherwise `ttl--`, `hop_count++`, set `src_pseudo` to our own current-epoch pseudonym and recompute `link_tag`, then wait a **random 10–50 ms jitter** (weaker RSSI → shorter wait, so farther nodes relay first, as Meshtastic does) |
-| 6 | If the same `msg_id` is heard from someone else during the wait, cancel (rebroadcast suppression). Otherwise rebroadcast |
+| 6 | Count copies of the same `msg_id` heard from others during the wait (the copy that started the timer doesn't count). Once the count reaches **k**, cancel (rebroadcast suppression). Otherwise rebroadcast when the timer fires. k is set by a sim sweep (proposed 2–3); the jitter window must be at least 2–3× the airtime of k frames |
 
 ### 4.3 Route learning + self-healing (Phase 2)
 
@@ -182,6 +182,9 @@ Use the RSSI gate + low TX power by default. Keep the allowlist as the "demo mus
 | Date | Decision | Owner | Status |
 |---|---|---|---|
 | Nov 14 | **Relays rewrite `src_pseudo` with their own pseudonym before rebroadcasting.** The field means "who just transmitted this," not "who originated it." Zero extra bytes. Why: §4.3 route learning needs to know which neighbor handed over a frame, and nothing else in §4.1 carries that (MACs rotate every 60 s); a cleartext originator pseudonym leaked the flood's source to passive observers; and the IPS's RSSI-per-identity feature saw every relayed frame as a spoof. Impact: firmware rewrites the field and recomputes `link_tag` per hop (Comp E); Network #2 defines the per-hop `link_tag`; watchtower `pseudo` = transmitter (AI/ML). Write-up: https://claude.ai/artifact/QZENs6ZDvkPTan5YicPo8Q | Network #1 | Decided. Open: directed forwarding past two hops (Network #1) |
+| Nov 14 | **RREQ and RREP dropped from `ver_type`.** Route discovery comes from the first data flood (relays note which neighbor each frame came from) and the ACK retracing that path; no separate discovery frames. A standard RREQ would also put the destination in cleartext. May return later as a sim-only scaling experiment if time allows. | Network #1 | Decided |
+| Nov 15 | **Rebroadcast suppression cancels after k duplicates, not 1.** Cancelling on the first duplicate leaves coverage holes: if X and Y both hear A and each other, and Z hears only X, Y relays first (weaker RSSI, shorter wait), X cancels, and Z never gets the message. Because the wait is RSSI-based this repeats on every retry. Fix follows Trickle's suppression constant (RFC 6206 §6.5–6.6): cancel only after k duplicates, with the jitter window at least 2–3× the airtime of k frames. Estimated airtime is ~3 ms per 240-byte frame at ESP-NOW's 1 Mbps default, so k = 2–3 fits the 10–50 ms window. Impact: each pending relay keeps a duplicate counter (Network #1, firmware: Comp E); Comp E measures real broadcast airtime on Tuesday. | Network #1 | Decided. Value of k: from sim sweep, confirm at freeze |
+| Nov 15 | **Retries use a new `msg_id`; repeats are caught by sequence number.** Resending with the same `msg_id` fails: every relay still holds it in the seen-cache (~60 s) and drops the retry as a duplicate, and the IPS would read it as a replay. Each retry now gets a fresh random `msg_id` but keeps the original inner sequence number. The recipient delivers a message only for a new sequence number; a repeat means the first ACK was lost, so it resends the ACK without delivering again. The sender accepts an ACK for any attempt's `msg_id`, stops the retry timer on the first one, and ignores later ones. Impact: duplicate detection at the recipient moves from `msg_id` to sequence number (Network #2's replay window); a retry looks like a new message to the IPS, not a replay (AI/ML). Spec: `PROTOCOL.md` §5.1–5.2. | Network #1 | Decided. Confirm at freeze with Network #2 and AI/ML |
 
 ---
 
