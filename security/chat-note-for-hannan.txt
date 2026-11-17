@@ -1,0 +1,7 @@
+Hannan, I answered the Network #2 part of IPS_DATA_NEEDS in security/notes-for-hannan.md. The main things for the IPS:
+1) The watchtower will add a "node" field (A-D, X, or "?") to every log line, so please group features by node instead of mac. Identities now stay the same across the 60 s rotations.
+2) New packet types: DATA, HELLO, CTRL, KEYS. RREQ/RREP are gone, ACKs look like DATA, and BLOCK is now CTRL (needs team sign-off).
+3) The same msg_id from several transmitters is normal flooding. Red flags: the same transmitter sending it twice, it coming back after more than 60 s, or hop going down.
+4) New block cmd: {"cmd":"block","node":"X","reason":...,"until":...}. Blocks now survive rotation, and spoofs can be blocked by pseudo+MAC.
+5) ips/data/ is gitignored, so I suggest putting datasets in ips/datasets/.
+The attack specs (rates, timings) are coming next.

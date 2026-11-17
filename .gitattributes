@@ -1,0 +1,3 @@
+# Vendored third-party code: keep exact upstream bytes (no CRLF conversion on checkout),
+# so the SHA-256 hashes in firmware/lib/monocypher/README.md match on every OS.
+firmware/lib/monocypher/** -text
