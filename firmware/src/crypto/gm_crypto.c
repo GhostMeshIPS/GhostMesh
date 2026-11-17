@@ -181,15 +181,19 @@ void gm_message_key(const uint8_t ck[32], uint8_t mk[32])
     crypto_blake2b_keyed(mk, 32, ck, 32, (const uint8_t *)"GM-MSG", 6);
 }
 
-bool gm_peer_message_key(const gm_crypto_t *c, int peer_slot, uint16_t epoch, uint8_t mk[32])
+void gm_chain_step(const uint8_t ck[32], uint16_t next_epoch, const uint8_t *dh, uint8_t out[32])
 {
-    if (peer_slot < 0 || peer_slot >= GM_MAX_PEERS || !c->peers[peer_slot].used) return false;
-    uint8_t ck[32];
-    gm_chain_start(c->peers[peer_slot].root, epoch, ck);   /* 14b replaces this with the ratchet */
-    gm_message_key(ck, mk);
-    crypto_wipe(ck, sizeof ck);
-    return true;
+    uint8_t lbl[10];
+    memcpy(lbl, "GM-CHAIN", 8);
+    gm_put_be16(lbl + 8, next_epoch);
+    crypto_blake2b_ctx ctx;
+    crypto_blake2b_keyed_init(&ctx, 32, ck, 32);
+    crypto_blake2b_update(&ctx, lbl, sizeof lbl);
+    if (dh) crypto_blake2b_update(&ctx, dh, 32);
+    crypto_blake2b_final(&ctx, out);
 }
+
+/* gm_peer_message_keys() lives in gm_ratchet.c with the rest of the ratchet. */
 
 /* ---- Inner header (decision 5) ----------------------------------------------------- */
 
@@ -243,47 +247,54 @@ bool gm_encrypt(gm_crypto_t *c, const rt_inner_t *in, rt_frame_t *f)
     int slot = find_peer(c, in->recipient_id);
     if (slot < 0) return false;
 
-    uint8_t pt[GM_INNER_BYTES], mk[32], ad[GM_AD_BYTES];
+    uint8_t pt[GM_INNER_BYTES], mks[2][32], ad[GM_AD_BYTES];
     if (!gm_inner_pack(in, pt)) return false;
-    if (!gm_peer_message_key(c, slot, gm_get_be16(f->epoch), mk)) return false;
+    if (gm_peer_message_keys(c, slot, gm_get_be16(f->epoch), mks) < 1) { crypto_wipe(pt, sizeof pt); return false; }
+    uint8_t *mk = mks[0];                            /* main key: what the peer expects */
 
     c->rng(c->rng_ctx, f->nonce, sizeof f->nonce);   /* random 24-byte nonce */
     gm_ad(f, ad);
     crypto_aead_lock(f->ciphertext, f->aead_tag, mk, f->nonce, ad, sizeof ad, pt, sizeof pt);
 
     crypto_wipe(pt, sizeof pt);
-    crypto_wipe(mk, sizeof mk);
+    crypto_wipe(mks, sizeof mks);
     return true;
 }
 
+/* Implemented in gm_ratchet.c: "the DH version wins" when a frame verifies under the alternate. */
+void gm_ratchet_note_key_used(gm_crypto_t *c, int peer_slot, uint16_t wire_epoch, int key_index);
+
 bool gm_try_decrypt(gm_crypto_t *c, const rt_frame_t *f, rt_inner_t *out)
 {
-    uint8_t ad[GM_AD_BYTES], mk[32], pt[GM_INNER_BYTES];
+    uint8_t ad[GM_AD_BYTES], mks[2][32], pt[GM_INNER_BYTES];
     uint16_t epoch = gm_get_be16(f->epoch);
     gm_ad(f, ad);
 
     int start = (c->last_peer >= 0 && c->last_peer < GM_MAX_PEERS) ? c->last_peer : 0;
-    bool ok = false;
-    for (int n = 0; n < GM_MAX_PEERS && !ok; n++) {
+    bool ok = false, done = false;
+    for (int n = 0; n < GM_MAX_PEERS && !done; n++) {
         int i = (start + n) % GM_MAX_PEERS;
         if (!c->peers[i].used) continue;
-        if (!gm_peer_message_key(c, i, epoch, mk)) continue;
-        if (crypto_aead_unlock(pt, f->aead_tag, mk, f->nonce, ad, sizeof ad,
-                               f->ciphertext, sizeof f->ciphertext) != 0) continue;
+        int nk = gm_peer_message_keys(c, i, epoch, mks);
+        for (int k = 0; k < nk && !done; k++) {
+            if (crypto_aead_unlock(pt, f->aead_tag, mks[k], f->nonce, ad, sizeof ad,
+                                   f->ciphertext, sizeof f->ciphertext) != 0) continue;
+            done = true;   /* a frame authenticates under at most one key; stop here */
 
-        /* Authentic. Now it must really be for us, from that peer (decision 5). */
-        rt_inner_t tmp;
-        if (gm_inner_unpack(pt, &tmp) &&
-            tmp.recipient_id == c->node_id &&
-            tmp.sender_id == c->peers[i].node_id) {
-            *out = tmp;
-            c->last_peer = i;
-            ok = true;
+            /* Authentic. Now it must really be for us, from that peer (decision 5). */
+            rt_inner_t tmp;
+            if (gm_inner_unpack(pt, &tmp) &&
+                tmp.recipient_id == c->node_id &&
+                tmp.sender_id == c->peers[i].node_id) {
+                *out = tmp;
+                c->last_peer = i;
+                gm_ratchet_note_key_used(c, i, epoch, k);
+                ok = true;
+            }
+            crypto_wipe(&tmp, sizeof tmp);
         }
-        crypto_wipe(&tmp, sizeof tmp);
-        break;   /* a frame authenticates under at most one key; don't keep trying */
     }
-    crypto_wipe(mk, sizeof mk);
+    crypto_wipe(mks, sizeof mks);
     crypto_wipe(pt, sizeof pt);
     return ok;
 }

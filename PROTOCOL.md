@@ -244,19 +244,30 @@ After decrypting, the recipient checks that `recipient_id` is itself and that `s
   where `DH = X25519(r_me(e+1).sk, r_peer(e+1).pk)`. The DH is included only if this node holds the peer's key
   **and** the peer has confirmed holding ours; otherwise `DH` is empty. A node that can compute both versions
   keeps the other one as an alternate. If a peer's KEYS tag or message verifies under it, **the DH version wins**.
+  An unresolved alternate is carried through later hash-only boundaries (stepped the same way), so a split
+  can still converge after silent epochs.
+- **Missed boundaries:** a node that missed epochs (off, rebooted) steps each one hash-only, up to **10**; for a
+  longer gap it RESYNCs every peer.
 - **Message key:** `mk[e] = BLAKE2b(key=ck[e], 32, "GM-MSG")`. AEAD: XChaCha20-Poly1305 with a random
   24-byte `nonce`; associated data `ver_type || flags || msg_id || epoch` (`frame[0:10] || frame[20:22]`).
 - **Trial decryption:** every DATA frame that passes `link_tag` is tried with each peer's `mk` for the
   frame's epoch (plus the alternate at a boundary). That's usually 8–16 tag checks, with no X25519 per frame.
 - **Deletion:** keep `ck` for the current and previous epoch only, and wipe `r(e).sk` once epoch e+1 has passed.
-  State is saved to NVS once per epoch. Static keys stay on the board (RESYNC needs them).
-- **KEYS frame** ⚑ (flooded like DATA). In the 170-byte region: `target_epoch`(2) ‖ `mode`(1: normal /
-  resync) ‖ `next_pk`(32) ‖ 8 slots × [`tag`(8) ‖ `conf`(4)]; the rest, plus `nonce` and `aead_tag`, is random.
-  `tag[P] = BLAKE2b(key=ck[e][me,P] (root in resync mode), 8, "GM-KEYS" || target_epoch || mode || next_pk || conf)`;
+  The state is exported as a fixed, versioned ~1.5 KB blob (`gm_state_export`) and saved to NVS whenever it changes
+  (at least once per epoch). Static keys stay on the board (RESYNC needs them).
+- **KEYS frame** ⚑ (flooded like DATA). In the 170-byte `ciphertext` field: `target_epoch`(2) ‖ `mode`(1: 0 normal /
+  1 resync) ‖ `next_pk`(32) ‖ [resync only: `nonce`(8)] ‖ 8 slots × [`tag`(8) ‖ `conf`(4)]. The slots start at byte 35
+  (normal) or 43 (resync). The rest of the field, plus the frame's `nonce` and `aead_tag`, is random.
+  `tag[P] = BLAKE2b(key=ck[e][me,P] (root in resync mode), 8, "GM-KEYS" || target_epoch || mode || [nonce] || next_pk || conf)`;
   `conf = BLAKE2b(4, "GM-CONF" || peer's r(e+1) pk)`. Slots are in random order, and unused slots are random bytes.
-- **RESYNC:** if no KEYS frame from an expected peer verifies for 2 epochs (or on first boot), flood a KEYS
-  frame in resync mode carrying the epoch and a random 8-byte nonce. Both sides then reset using the chain-start
-  formula. At most one per pair per 5 epochs; repeated nonces are ignored; serial event `resync`.
+  Normal frames announce `target_epoch = e+1`. A node **ignores KEYS frames carrying its own `next_pk`** (its own echo),
+  because pair keys are symmetric and its tags would otherwise verify.
+- **RESYNC:** triggered when an expected peer's KEYS haven't verified for 2 epochs **and** an unverifiable KEYS frame
+  was heard recently (the sign of a split chain, so a powered-off peer doesn't trigger it). Also sent on first boot
+  and after a gap of more than 10 epochs. The node resets its own side with the chain-start formula and floods a
+  KEYS frame in resync mode (`target_epoch` = current or previous epoch, random 8-byte nonce) 3 times. The receiver
+  resets too. Limits: at most one per pair per 5 epochs, **unless the pair is already silent** (2+ epochs without a
+  verified KEYS frame, which avoids deadlock when boards boot at different times). Repeated nonces are ignored. Serial event `resync`.
 - **Alerts:** if a pair has had no DH step for 3 epochs, print the serial event `no_dh`.
 
 ### 9.7 Replay protection (outermost first)
@@ -352,6 +363,8 @@ _Owner: Rashad + Jose_
 | Hop padding | 0–2 | Raise default TTL by 2 to keep range (§9.9) |
 | Cache insertion limit | ~20 new `msg_id`/s per transmitter | Confirm with sim (§9.9) |
 | Body max | 152 bytes | §9.5 |
+| Missed-epoch catch-up | up to 10 hash-only steps | Longer gap → RESYNC (§9.6) |
+| Persisted crypto state | 1517 bytes (`GM_STATE_BYTES`) | Versioned blob, up to 8 peers (§9.6) |
 
 ## 13. Metric definitions
 

@@ -62,6 +62,15 @@ static void setup(void)
     check(gm_add_peer(&A, ID_B, B.x_pk) && gm_add_peer(&A, ID_C, C.x_pk), "setup: A adds peers");
     check(gm_add_peer(&B, ID_A, A.x_pk) && gm_add_peer(&B, ID_C, C.x_pk), "setup: B adds peers");
     check(gm_add_peer(&C, ID_A, A.x_pk) && gm_add_peer(&C, ID_B, B.x_pk), "setup: C adds peers");
+
+    /* Stage 14b: keys exist only after the first time beacon. Sync everyone into the
+     * absolute epoch whose wire value is 0x0102; a fresh chain there equals the
+     * chain-start formula, which the Python cross-check recomputes. */
+    uint64_t t = (uint64_t)0x01B00102u * GM_EPOCH_MS + 1000u;
+    gm_events_t ev;
+    gm_crypto_t *all[3] = { &A, &B, &C };
+    for (int i = 0; i < 3; i++) { gm_clock_on_beacon(all[i], t, 0); gm_tick(all[i], 0, &ev); }
+    check(A.have_chain && gm_wire_epoch(A.cur_epoch) == 0x0102, "setup: nodes synced to epoch 0x0102");
 }
 
 /* Builds the header fields routing fills BEFORE encrypt() (AD precondition). */
@@ -139,10 +148,10 @@ static void test_keys(void)
     gm_crypto_t T = A;
     check(!gm_add_peer(&T, 99, zero_pk), "low-order (all-zero) public key rejected");
 
-    uint8_t mk[32];
-    gm_peer_message_key(&A, 1, 0x0102, mk);
+    uint8_t mks[2][32];
+    check(gm_peer_message_keys(&A, 1, 0x0102, mks) == 1, "one message key for a fresh pair");
     vec("root_AC", A.peers[1].root, 32);
-    vec("mk_AC_0102", mk, 32);
+    vec("mk_AC_0102", mks[0], 32);
 }
 
 static void test_e2e(void)
@@ -166,9 +175,10 @@ static void test_e2e(void)
     {
         rt_frame_t g; header(&g, 0x58, 0x0102);
         rt_inner_t wrong = data_msg(ID_C, ID_B, "not for A", 1);
-        uint8_t pt[GM_INNER_BYTES], mk[32], adb[GM_AD_BYTES];
+        uint8_t pt[GM_INNER_BYTES], mks[2][32], adb[GM_AD_BYTES];
+        uint8_t *mk = mks[0];
         gm_inner_pack(&wrong, pt);
-        gm_peer_message_key(&C, 0, 0x0102, mk);          /* C's slot 0 = peer A */
+        gm_peer_message_keys(&C, 0, 0x0102, mks);        /* C's slot 0 = peer A */
         fill(g.nonce, 24, 0x33);
         gm_ad(&g, adb);
         crypto_aead_lock(g.ciphertext, g.aead_tag, mk, g.nonce, adb, sizeof adb, pt, sizeof pt);

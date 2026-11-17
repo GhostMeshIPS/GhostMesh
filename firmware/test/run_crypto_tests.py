@@ -72,6 +72,16 @@ def inner_unpack(pt):
                 timestamp=int.from_bytes(pt[8:12], "big"), seq=int.from_bytes(pt[12:16], "big"),
                 type=pt[16], len=pt[17], body=pt[18:18 + pt[17]], padding=pt[18 + pt[17]:])
 
+def chain_step(ck, next_epoch, dh=None):
+    return hashlib.blake2b(b"GM-CHAIN" + be16(next_epoch) + (dh or b""), key=ck, digest_size=32).digest()
+
+def conf_hash(pk):
+    return hashlib.blake2b(b"GM-CONF" + pk, digest_size=4).digest()
+
+def keys_tag(key, region, conf):
+    nonce = region[35:43] if region[2] == 1 else b""
+    return hashlib.blake2b(b"GM-KEYS" + region[0:3] + nonce + region[3:35] + conf, key=key, digest_size=8).digest()
+
 def ctrl_message(region, payload_len):
     return b"GM-CTRL" + region[:9 + payload_len]
 
@@ -87,19 +97,21 @@ def find_cc():
         sys.exit("No C compiler found. Install gcc (e.g. MSYS2 ucrt64) or set GM_CC.")
     return cc
 
-def build_and_run():
+def build_and_run(test_name):
     cc = find_cc()
     env = dict(os.environ)
     env["PATH"] = str(Path(cc).parent) + os.pathsep + env.get("PATH", "")   # MSYS2 gcc needs its DLLs
     BUILD.mkdir(exist_ok=True)
-    exe = BUILD / ("test_crypto.exe" if os.name == "nt" else "test_crypto")
+    exe = BUILD / (test_name + (".exe" if os.name == "nt" else ""))
+    src = FW / "src" / "crypto"
+    lib = FW / "lib" / "monocypher"
     cmd = [cc, "-std=c99", "-O2", "-Wall", "-Wextra", "-pedantic", "-Werror",
-           "-I", str(FW / "src" / "crypto"), "-I", str(FW / "src" / "routing"), "-I", str(FW / "lib" / "monocypher"),
-           str(FW / "src" / "crypto" / "gm_crypto.c"), str(FW / "lib" / "monocypher" / "monocypher.c"),
-           str(FW / "lib" / "monocypher" / "monocypher-ed25519.c"), str(HERE / "test_crypto.c"), "-o", str(exe)]
+           "-I", str(src), "-I", str(FW / "src" / "routing"), "-I", str(lib),
+           str(src / "gm_crypto.c"), str(src / "gm_ratchet.c"), str(lib / "monocypher.c"),
+           str(lib / "monocypher-ed25519.c"), str(HERE / (test_name + ".c")), "-o", str(exe)]
     r = subprocess.run(cmd, env=env, capture_output=True, text=True)
     if r.returncode != 0:
-        sys.exit(f"Compile failed:\n{r.stdout}{r.stderr}")
+        sys.exit(f"Compile failed ({test_name}):\n{r.stdout}{r.stderr}")
     r = subprocess.run([str(exe)], env=env, capture_output=True, text=True)
     return r.returncode, r.stdout
 
@@ -157,20 +169,40 @@ def cross_check(vecs):
     ok(len(wt_pk) == 32, "py: watchtower public key derived")
     return results
 
-def main():
-    code, out = build_and_run()
-    c_results = [(l.startswith("PASS"), l[5:]) for l in out.splitlines() if l.startswith(("PASS", "FAIL"))]
-    vecs = {m.group(1): bytes.fromhex(m.group(2)) for m in re.finditer(r"^VEC (\S+) ([0-9a-f]+)$", out, re.M)}
-    py_results = cross_check(vecs)
+def cross_check_ratchet(vecs):
+    results = []
+    def ok(cond, name): results.append((bool(cond), name))
+    ck, dh = fill(0x11), fill(0x22)
+    ok(vecs.get("step_dh") == chain_step(ck, 0x0103, dh), "C == py: chain step with DH")
+    ok(vecs.get("step_hash") == chain_step(ck, 0x0103), "C == py: hash-only chain step")
+    region, key, c_pk = vecs.get("keys_region", b""), vecs.get("keys_ck_AC", b""), vecs.get("keys_C_next_pk", b"")
+    found = False
+    for s in range(8):
+        slot = region[35 + 12 * s: 47 + 12 * s]
+        if len(slot) == 12 and keys_tag(key, region, slot[8:]) == slot[:8] and slot[8:] == conf_hash(c_pk):
+            found = True
+    ok(found, "C == py: KEYS slot tag + confirmation of C's next key")
+    return results
 
-    for good, name in c_results + py_results:
+def run_suite(test_name, checker):
+    code, out = build_and_run(test_name)
+    tag = f"[{test_name}] "
+    c_results = [(l.startswith("PASS"), tag + l[5:]) for l in out.splitlines() if l.startswith(("PASS", "FAIL"))]
+    vecs = {m.group(1): bytes.fromhex(m.group(2)) for m in re.finditer(r"^VEC (\S+) ([0-9a-f]+)$", out, re.M)}
+    results = c_results + [(g, tag + n) for g, n in checker(vecs)]
+    if "SUMMARY" not in out or (code != 0 and all(g for g, _ in c_results)):
+        results.append((False, tag + f"C test binary did not finish cleanly (exit {code})"))
+    return results
+
+def main():
+    results = []
+    for name, checker in (("test_crypto", cross_check), ("test_ratchet", cross_check_ratchet)):
+        results += run_suite(name, checker)
+    for good, name in results:
         print(f"{'PASS' if good else 'FAIL'}  {name}")
-    total = len(c_results) + len(py_results)
-    bad = sum(1 for g, _ in c_results + py_results if not g)
-    if "SUMMARY" not in out:
-        print("C test binary did not finish (crash?)"); bad += 1
-    print(f"\n{total - bad}/{total} passed")
-    sys.exit(1 if bad or code else 0)
+    bad = sum(1 for g, _ in results if not g)
+    print(f"\n{len(results) - bad}/{len(results)} passed")
+    sys.exit(1 if bad else 0)
 
 if __name__ == "__main__":
     main()

@@ -418,3 +418,30 @@ then checks the property we actually depend on: firmware and laptop tools comput
 | **Cross-check against an independent Python implementation** | C unit tests only | C tests show the code agrees with *itself*. Re-deriving every byte in Python with different libraries (libsodium, `cryptography`) shows it agrees with the *spec*. The laptop tools (keygen, pcap converter, IPS) must compute identical bytes, so those Python functions become their reference |
 | **Mutation check** | Trust a green run | The first run passed 54/54, but deliberately broken copies showed the recipient check, the sender check and the MAC bit-fix weren't really tested (each was hidden by another check or a lucky vector). Three targeted tests were added. A test suite that can't fail proves nothing |
 
+---
+
+## 14b. Ratchet implementation choices
+
+| Choice | Alternatives | Why this one |
+|---|---|---|
+| **One `gm_tick()` driver** | Firmware calls separate functions on its own timers | Every timing rule (slew, 10 s KEYS cadence, 30 s beacon alert, epoch steps, RESYNC triggers) stays in portable, tested code. Firmware only forwards events, so there are fewer places for the two halves to disagree |
+| **Hash-step up to 10 missed epochs, then RESYNC** | RESYNC after any gap; unlimited catch-up | A reboot or short power loss needs no extra messages (both sides hash-step identically). A long absence restarts cleanly instead of catching up through hundreds of hashes. The bound also limits CPU work at boot |
+| **RESYNC only when unverifiable KEYS are heard** | Spec as first written (2 silent epochs) | Silence alone can't tell "split chain" from "board switched off". Hearing KEYS frames that none of our keys verify is the actual sign of a split, so powered-off peers don't trigger RESYNC floods (which the IPS would also have to filter) |
+| **Export/import blob** | gm calls a save hook | gm never touches flash, so it stays portable and testable on the laptop, and firmware decides when to write (wear) |
+
+**Refinements found by the tests** (each one is a case the written spec hadn't covered):
+- **Accept RESYNC on an already-silent pair, even inside the rate limit.** Tracing boards that boot at different
+  times showed a deadlock: each side's boot RESYNC rate-limits the other's. A pair that is already silent is broken
+  anyway, so accepting is safe. Replays against a *healthy* pair, which 10d was aimed at, are still refused.
+- **Carry the alternate through hash-only steps.** "The DH version wins" only works while the alternate exists.
+  Dropping it at the next silent boundary turned a recoverable split into a permanent one (the RESYNC path
+  would still recover it, but only after ~2 epochs).
+- **Ignore your own KEYS echo.** Pair chain keys are symmetric, so a node can't tell its own KEYS frame from its
+  peer's by the tag alone. A reflected frame would plant the node's own key as the peer's. Routing's seen-cache
+  normally drops echoes; the key layer now refuses them too, so security doesn't depend on routing.
+
+**Why simulate a thief:** "post-compromise security" is easy to claim and hard to show. The test copies a node's
+*entire* state mid-epoch, gives the thief every KEYS frame the real node hears, and shows exactly what the design
+promises: the thief reads the stolen epoch and the next one (it holds the next DH key), then is locked out, while
+the real node keeps reading. That is the claim in the threat model (A4), demonstrated rather than asserted.
+

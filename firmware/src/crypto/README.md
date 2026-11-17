@@ -1,20 +1,12 @@
-# `gm_crypto`: GhostMesh security primitives (stage 14a)
+# `gm_crypto`: GhostMesh security layer (stages 14a + 14b)
 
 Owner: Jose (Network #2). Spec: [`PROTOCOL.md` §9](../../../PROTOCOL.md). Portable C99, no ESP headers
 (same rule as `routing.c`), built on [Monocypher 4.0.2](../../lib/monocypher/README.md).
 
-| Function | Spec |
-|---|---|
-| `gm_link_tag`, `gm_link_tag_ok` (constant time) | §9.4 |
-| `gm_pseudonym`, `gm_mac` | §9.3 |
-| `gm_root_key`, `gm_chain_start`, `gm_message_key`, `gm_peer_message_key` | §9.6 |
-| `gm_inner_pack` / `gm_inner_unpack` | §9.5 |
-| `gm_encrypt`, `gm_try_decrypt`, `gm_ad` | §9.6 |
-| `gm_ctrl_sign`, `gm_ctrl_verify` | §9.8 |
-
-**Stage 14a vs. 14b:** today `gm_peer_message_key()` derives the epoch's key straight from the static root key
-(the RESYNC formula), so there is **no forward secrecy yet**. Stage 14b adds the epoch ratchet, KEYS/RESYNC and the
-mesh clock behind that same function; callers don't change.
+| File | What | Spec |
+|---|---|---|
+| `gm_crypto.c` | `link_tag`, pseudonym/MAC, inner-header codec, encrypt / trial-decrypt, CTRL sign/verify, root/chain/message-key formulas | §9.3–9.6, §9.8 |
+| `gm_ratchet.c` | mesh clock, epoch DH ratchet, KEYS/RESYNC frames, alerts, persistence | §9.2, §9.6 |
 
 ## Tests
 
@@ -23,33 +15,55 @@ python firmware/test/run_crypto_tests.py
 ```
 
 Needs gcc (MSYS2 ucrt64 on Windows; set `GM_CC` to use another compiler) and `pip install pynacl cryptography`.
-It builds with `-Wall -Wextra -pedantic -Werror` and runs 40 C checks. It then re-implements every formula
-independently in Python (hashlib, PyNaCl/libsodium, cryptography) and checks the C output byte for byte (16 checks).
-Six deliberate code mutations were each caught by at least one test. **Not tested:** the pseudonym rehash
-for reserved values, which needs a 1-in-2³¹ hash output to trigger.
+Builds with `-Wall -Wextra -pedantic -Werror` and runs two C programs:
+- `test_crypto` (14a): frames, encryption and signatures.
+- `test_ratchet` (14b): simulates 3 nodes over many epochs, covering clock slew, DH progression, forward
+  secrecy, a thief with stolen state being locked out, one-way loss, splits and convergence, fork + RESYNC,
+  RESYNC replay, a powered-off peer, reboot gaps, persistence, the ±1 epoch window and own-echo.
 
-## Wiring into `rt_platform_t` (for Yunus)
+It then re-derives every formula independently in Python (PyNaCl/libsodium, cryptography) and checks the bytes.
+**131/131 pass.** Of 18 deliberate code mutations, 16 are caught. The other two can't be caught by any test:
+the reserved-pseudonym rehash (needs a 1-in-2³¹ hash output), and the `my_next_sk` wipe, which the next line
+overwrites anyway.
 
-The platform `ctx` is firmware-owned, so the adapters live in firmware. Each one is a one-liner:
+## Wiring it into firmware (for Yunus)
 
 ```c
-static bool p_try_decrypt(void *ctx, const rt_frame_t *f, rt_inner_t *out) { return gm_try_decrypt(&((fw_t *)ctx)->gm, f, out); }
-static void p_encrypt(void *ctx, const rt_inner_t *in, rt_frame_t *f)      { gm_encrypt(&((fw_t *)ctx)->gm, in, f); /* see note 4 */ }
-static void p_link_tag(void *ctx, const rt_frame_t *f, uint8_t out[8])     { gm_link_tag(((fw_t *)ctx)->gm.network_key, f, out); }
-static void p_pseudonym(void *ctx, uint8_t out[4]) { fw_t *w = ctx; gm_pseudonym(w->gm.pseudo_secret, w->epoch, out); }
+gm_init(&g, MY_ID, network_key, pseudo_secret, x25519_sk, watchtower_pk, rng_fn, NULL);  /* rng: esp_fill_random */
+for (each peer) gm_add_peer(&g, peer_id, peer_x25519_pk);
+if (nvs has "gm_state") gm_state_import(&g, blob, GM_STATE_BYTES);    /* ~1.5 KB */
+
+/* every ~100 ms */
+gm_events_t ev;
+gm_tick(&g, esp_timer_get_time() / 1000, &ev);
+if (ev.keys_due)      { gm_keys_build(&g, region); flood a ver_type=KEYS frame with it; }
+if (ev.state_changed) { gm_state_export(&g, blob, sizeof blob); nvs write "gm_state"; }
+if (ev.no_beacon)     serial {"ev":"no_beacon","secs":30}
+if (ev.no_dh_mask)    serial {"ev":"no_dh","peer":...}  (one per set bit = peer slot)
+if (ev.resync_mask)   serial {"ev":"resync","peer":...}
+
+/* received, link_tag OK, not blocked */
+KEYS frame -> gm_keys_receive(&g, f->ciphertext);
+CTRL TIME  -> gm_ctrl_verify(&g, f->ciphertext, ...) then gm_clock_on_beacon(&g, issued_at_ms, local_ms);
 ```
-`gm_rng_fn` on the board: wrap `esp_fill_random()` (Wi-Fi must be on for true randomness).
+Notes:
+- **The 170-byte "region"** for KEYS and CTRL frames is the `ciphertext` field (bytes 54–223). When building one,
+  fill `nonce` and `aead_tag` with random bytes so the frame looks like DATA on the air (PROTOCOL §9.6, §9.8).
+- `my_pseudonym` / `current_epoch` callbacks: `gm_pseudonym(g.pseudo_secret, gm_wire_epoch(g.cur_epoch), out)` and
+  `gm_wire_epoch(g.cur_epoch)`. The MAC for the epoch is `gm_mac(...)`; change it at each `ev.epoch_changed`.
+- Until `gm_tick` reports `synced_now`, there are no keys: queue laptop sends (decision 2c).
 
 ## Changes needed in routing (for Rashad)
 
-1. **Encryption order** (decision 14): the AEAD authenticates `ver_type`, `flags`, `msg_id` and `epoch`, so
-   `build_and_send` must fill them **before** calling `encrypt()`:
-   NEW_MSG → fill those 4 fields → BHD → `encrypt()` → fill `ttl`/`hop_count`/`src_pseudo`/`next_hop` → `link_tag` last.
-2. **Cleartext type is always DATA** (decision 5): set `ver_type = RT_TYPE_DATA` for ACKs too. The real type is
-   `rt_inner_t.type`.
-3. **`RT_BODY_MAX` 153 → 152** (decision 5). `gm_inner_pack` already rejects 153.
-4. **`encrypt` should return `bool`.** `gm_encrypt` fails on an unknown recipient or a bad length. With the
-   current `void` callback, routing can't tell, and would transmit a frame with stale ciphertext.
-5. **`link_tag_valid()`** becomes: `compute_link_tag()` + constant-time compare (or call `gm_link_tag_ok`).
-6. **Freshness in `handle_data`** (decision 14): drop DATA with `|now − timestamp| > 5 s`, add
-   `RT_LOG_REPLAY_STALE`, and send no ACK (§9.7). `try_decrypt` does not check time.
+1. **Encryption order:** the AEAD authenticates `ver_type`, `flags`, `msg_id` and `epoch`, so `build_and_send`
+   fills them **before** `encrypt()`: NEW_MSG → those 4 fields → BHD → `encrypt()` → `ttl`/`hop`/`src_pseudo`/`next_hop`
+   → `link_tag` last.
+2. **Cleartext type is always DATA**, ACKs included. The real type is `rt_inner_t.type`.
+3. **`RT_BODY_MAX` 153 → 152.**
+4. **`encrypt` should return `bool`.** It fails on an unknown recipient, a bad length, or before the first sync.
+5. **`link_tag_valid()`** = `gm_link_tag_ok`.
+6. **Freshness in `handle_data`:** drop DATA with `|now − timestamp| > 5 s`, log `RT_LOG_REPLAY_STALE`, send no ACK.
+7. **KEYS and CTRL types:** flood them like DATA, but hand KEYS to `gm_keys_receive` and CTRL to the CTRL path.
+   Relay CTRL **only after** it verifies (decision 8d / O8).
+8. **Own frames:** keep caching your own `msg_id` at send time. `gm_keys_receive` also ignores its own KEYS as a
+   backstop, but the seen-cache is the first defense.
