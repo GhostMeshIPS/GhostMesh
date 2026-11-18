@@ -410,11 +410,11 @@ _Owner: Rashad + Jose_
 | Parameter | Value | Notes |
 |---|---|---|
 | Default TTL (hardware) | TBD | |
-| Default TTL (sim) | TBD | |
+| Default TTL (sim) | 16 | From the sim's `ttl_sweep` (commit `72c8408`): 50-node meshes need 14–16 to reach almost everyone, 20 nodes are already saturated at 12. Includes the +2 for hop padding. See `docs/results/sim-results.md` |
 | Seen-cache size | TBD | |
 | Seen-cache expiry | TBD | |
 | Relay jitter window | TBD | Planned 10–50 ms. Must be at least 2–3× the airtime of k frames |
-| Suppression threshold k | TBD | Proposed 2–3; settle by sim sweep |
+| Suppression threshold k | 2 | From the sim's `k_sweep` (50 nodes, 300 and 1000 kbps, commit `72c8408`): k = 1 loses messages to coverage holes; k = 3 cuts tail latency but costs more transmissions and collisions. See `docs/results/sim-results.md` |
 | Frame airtime | TBD | Estimated ~3 ms per 240-byte frame at 1 Mbps; measure on hardware later |
 | HELLO interval | TBD | |
 | Neighbor expiry | TBD | |
