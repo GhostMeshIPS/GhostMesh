@@ -89,8 +89,8 @@ surface; the attack scripts themselves are task 11.
 | **Injection / tampering** | Forge headers, swap ciphertext, flood junk | A2 | `link_tag` on every byte; AEAD with header fields in the AD | Junk still costs airtime |
 | **Replay** | Resend captured DATA, KEYS, CTRL or RESYNC | A2, A3 | Five replay layers (9.7); CTRL time checks (9.8); RESYNC nonce + rate limit (10d) | — |
 | **Spoofing / impersonation** | Transmit under another node's pseudonym and MAC; get the real node blocked | A3 | IPS RSSI and MAC↔pseudonym checks; O9 policy (12c) | Full pseudo+MAC copy relies on RSSI and the operator |
-| **Privilege escalation** | (1) Outsider → insider: a malformed frame crashes or takes over a node's parser. (2) Node → watchtower: capture the board holding the signing key. (3) Laptop → node: unauthenticated serial commands | A2, A3, A5 | (1) Outsiders can't reach parsers past `link_tag`; fixed-size layout. (2) Only W holds the signing key. (3) Physical access is out of scope (O16) | (1) An insider **can** reach the KEYS, CTRL and inner-header parsers, and KEYS frames are relayed to every node before anyone can check them, so one bad frame reaches the whole mesh. Covered by a fuzz test of the receive path and a 240-byte length check before any parsing (16a). (2) In the 4-board setup the signing key sits on relay D (O21) |
-| **Lateral movement** | From one captured node, reach others' traffic or control | A3, A4 | Pairwise keys keep each pair separate (§7). Nodes never learn `pseudo_secret`s of others. CTRL needs the watchtower's key | `network_key` is shared, so one capture = insider everywhere (O14). A parser exploit would spread by flooding (fuzzed, 16a). Capturing the watchtower reaches everything except content |
+| **Privilege escalation** | (1) Outsider → insider: a malformed frame crashes or takes over a node's parser. (2) Node → watchtower: capture the board holding the signing key. (3) Laptop → node: unauthenticated serial commands | A2, A3, A5 | (1) Outsiders can't reach parsers past `link_tag`; fixed-size layout. (2) Only W holds the signing key. (3) Physical access is out of scope (O16) | (1) An insider **can** reach the KEYS, CTRL and inner-header parsers, and KEYS frames are relayed to every node before anyone can check them, so one bad frame reaches the whole mesh. The parsers use fixed offsets and bounds checks, but this isn't tested yet (O24, open). (2) In the 4-board setup the signing key sits on relay D (O21) |
+| **Lateral movement** | From one captured node, reach others' traffic or control | A3, A4 | Pairwise keys keep each pair separate (§7). Nodes never learn `pseudo_secret`s of others. CTRL needs the watchtower's key | `network_key` is shared, so one capture = insider everywhere (O14). A parser exploit would spread by flooding (O24, open). Capturing the watchtower reaches everything except content |
 | **Denial of service** | Stop delivery: jam, flood, desynchronize keys or clocks, exhaust CPU, take out the watchtower, trick the IPS into blocking honest nodes | A2, A3, A5 | Detection + BLOCK; rate limits; retries and flooding; free-running clock | See §8 for each outage type |
 | **IPS manipulation** | Stay just under detection thresholds; slowly shift a node's baseline; behave normally while normal traffic is recorded for training | A3, A5 | Per-node baselines, ML + rules | Normal training traffic is recorded with X powered off (16f). Low-and-slow attacks under the thresholds and slow baseline drift remain |
 
@@ -131,8 +131,8 @@ from the spec; measured values belong in the results table.
 | **Insider flood** | X floods valid-looking frames | Airtime + CPU (trial decryption) in its range | IPS rate features | Per-transmitter insertion limit (10g), then BLOCK | Detection ≤ 5 s (G6) + BLOCK propagation |
 | **Key desync** | Lost or jammed KEYS frames split a pair's chain | One pair | Messages stop decrypting; RESYNC events; `no_dh` | Alternate-key convergence, then RESYNC after 2 silent epochs | Up to ~2–3 min per pair |
 | **Clock / boundary stress** | Every node rotates MAC, pseudonym and keys at the same, publicly known moment; route tables reset | Whole mesh for the length of the MAC-change outage | Delivery dips every 60 s | Retries | MAC-change outage (to measure). An attacker can time floods or jamming to boundaries |
-| **Node reboot** | Crash, brownout, power-bank swap, crash caused by a malformed frame (16a) | One node | Serial boot log, missing HELLOs | Wait for TIME (≤ 10 s), then RESYNC to peers | ≤ 10 s + resync; **never** while the watchtower is down (16b) |
-| **CTRL starvation** | Forged CTRL frames using up the verify budget | BLOCK/TIME enforcement beyond the first hop | Missing `BLOCKED` drops, `no_beacon` | Only failed verifies use a transmitter's budget, and the watchtower spaces BLOCKs away from TIME (16d) | Next re-issue (TIME every 10 s, BLOCK every epoch) |
+| **Node reboot** | Crash, brownout, power-bank swap, crash caused by a malformed frame (O24) | One node | Serial boot log, missing HELLOs | Wait for TIME (≤ 10 s), then RESYNC to peers | ≤ 10 s + resync; **never** while the watchtower is down (16b) |
+| **CTRL starvation** | Forged CTRL frames using up the verify budget, or a TIME and a BLOCK relayed through the same neighbour within 5 s (every frame counts against that neighbour's budget) | BLOCK/TIME enforcement two or more hops from the watchtower | Missing `BLOCKED` drops, `no_beacon` | Per-transmitter budget (10b); the dropped frame comes again at its next re-issue (accepted, 16d) | Up to 10 s for TIME, up to one epoch for BLOCK |
 | **False block** | IPS blocks an honest node (spoof, false positive) | That node | Operator, dashboard | Block expires or is ended early | Until `until_ms` |
 | **Watchtower loss** | See §7 | Detection, prevention, time | Missing TIME → `no_beacon` | Watchtower returns | Blocks lapse within ~2 min (16c) |
 
@@ -168,7 +168,7 @@ The protocol is tested on the host now; the simulator and the ESP32 testbed supp
 | Flood limits (10b, 10g) | — | Busy honest relay's `msg_id` rate in Rashad's sim, to confirm the ~20/s insertion limit |
 | Rotation (2a) and identity linking (O3) | — | MAC-change outage per rotation; stretch traffic-analysis test (can an observer link pseudonyms across epochs by RSSI?) |
 | Jamming detection (O17–O19) | — | `noise_floor` accuracy on hardware (1b) |
-| Receive-path robustness (16a) | Fixed offsets and bounds checks in `gm_crypto` / `gm_ratchet` | Fuzz test under AddressSanitizer/UBSan (to write) |
+| Receive-path robustness (O24) | Fixed offsets and bounds checks in `gm_crypto` / `gm_ratchet` | Fuzz test under AddressSanitizer/UBSan (to write) |
 | IPS detection and block policy (G6, O9) | IPS on synthetic sessions (`ips/synth.py`) | Detection time ≤ 5 s per attack on labeled testbed runs |
 
 ## 11. Out of scope (not claimed)
@@ -188,4 +188,8 @@ The protocol is tested on the host now; the simulator and the ESP32 testbed supp
 
 ## 12. Open items
 
-None. O1–O29 are closed; each closing decision is in [`project-breakdown.md` §4.7](../docs/planning/project-breakdown.md).
+| ID | Issue | Status |
+|---|---|---|
+| O24 | Insider-reachable parsers (KEYS, CTRL, inner header) and KEYS flooding make one malformed frame a mesh-wide crash or exploit; the ESP-NOW receive callback is reachable by outsiders | Open |
+
+O1–O23 and O25–O29 are closed; each closing decision is in [`project-breakdown.md` §4.7](../docs/planning/project-breakdown.md).

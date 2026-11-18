@@ -418,7 +418,7 @@ A5 we offer resilience and detection, not prevention (jamming and direction-find
 
 ---
 
-## 16. Availability hardening (closes O24–O29)
+## 16. Availability hardening (closes O25–O29)
 
 **Context:** adding the censor (A5, 12f) shifted the review from "who can read" to "who can stop the mesh".
 Most of what it found sits on the watchtower and on paths an insider can reach. Each choice below favours
@@ -426,10 +426,9 @@ what is cheap now, before the code it touches is written, over what would need n
 
 | Decision | Alternatives | Why this one |
 |---|---|---|
-| **16a Fuzz test + 240-byte length rule** (O24) | Length rule only; accept | The parsers are fixed-offset by design, but "by design" isn't evidence; a sanitizer-backed fuzz run on the existing host harness is ~1–2 h and turns the claim into a test (N6). The length rule matters most because the receive callback is the one piece of code an **outsider** reaches before `link_tag`. Flooding makes a parser bug mesh-wide, so this is cheap insurance for N7 |
 | **16b Accept: watchtower required to rejoin** (O25) | Provisional peer time; backup signer | Peer time lets an insider with two fake identities set a node's clock, and needs new clock rules and tests in the key layer days before the freeze. A backup signer needs a spare board (we have 4) and copies the most sensitive key. The demo never runs without W, so the cost isn't justified this week; the limit is named, with both fixes as future work |
 | **16c Accept: watchtower is the single point of failure** (O26) | BLOCK carrying 7 epochs of identifiers; backup watchtower | Killing the watchtower is a censor's obvious first move, and blocks then lapse within ~2 min. Extending BLOCK to 7 epochs would fit the CTRL region exactly, but it changes a wire layout the team is building against, for a scenario the demo never shows (the watchtower stays up). Keeping the frame format stable this week matters more (N6, N7); the 7-epoch BLOCK is recorded as the future-work fix |
-| **16d Charge failures only, space CTRL** (O27) | Token bucket with bursts; watchtower spacing only; also caching CTRL only after it verifies | Budgets exist to make forgers pay (10b). Charging every frame also made the watchtower's own TIME + BLOCK bursts pay, so a node two hops from W could drop a fresh BLOCK about half the time and wait up to a minute for the re-issue, which can break the G6 demo. Valid CTRL can't be forged and replays are skipped before any verify, so only failures need charging. Caching after verify was dropped: it would change `routing.c`'s receive order, and once (1) and (2) are in, real CTRL is lost only if the global cap is hit |
+| **16d Accept the verify budget as is** (O27) | Charge only failed verifies; token bucket with bursts; watchtower spacing; caching CTRL only after it verifies | Every fix changes CTRL handling rules that the recorded data and current build follow. Keeping the protocol frozen matters more this week (N6): the cost is a TIME or BLOCK dropped two or more hops from the watchtower until its next re-issue (≤ 10 s for TIME, ≤ 1 epoch for BLOCK). Charging only failed verifies is the recorded future-work fix |
 | **16e Accept, with a flood-rate limit for the demo** (O28) | Native USB + shed `raw` under load; drop `raw` from live logs | We control the attacker's flood rate (task 11), so keeping demo floods under ~100 frames/s avoids the ~120 frames/s log ceiling without asking Yunus or Hannan to change the watchtower output or schema this week (N6). A real flooder above that rate makes the IPS lag; native USB and shedding `raw` are the future-work fix |
 | **16f Clean training data only** (O29) | Also absolute ceilings and slow baseline adaptation; accept | Recording normal traffic with X powered off is a procedure, not code, and removes the most damaging case: a model that learned the attacker as normal. Ceilings and slow adaptation are real IPS work in Hannan's area; low-and-slow evasion is an inherent limit of anomaly detection and is documented as such |
 
