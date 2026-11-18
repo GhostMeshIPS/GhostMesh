@@ -218,6 +218,11 @@ def experiments(seeds: int = SEEDS) -> dict:
         # how much of the jitter window is random
         "jitter_sweep": _grid("jitter_sweep", replace(base, topology=TopologyConfig(n_nodes=50)), seeds,
                               **{"routing.jitter_rand_pct": [12, 25, 50]}),
+
+        # does a bigger TTL fix delivery in big meshes? (default_ttl includes the +2 for hop padding)
+        "ttl_sweep": _grid("ttl_sweep", base, seeds,
+                           **{"topology.n_nodes": [20, 50],
+                              "routing.default_ttl": [5, 8, 12]}),
     }
 
 
