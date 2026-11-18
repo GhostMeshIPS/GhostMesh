@@ -13,7 +13,6 @@ import dataclasses
 import hashlib
 import itertools
 import json
-import subprocess
 import sys
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -228,14 +227,6 @@ def experiments(seeds: int = SEEDS) -> dict:
 
 # ---- Layout check -----------------------------------------------------------------
 
-def build_routing_lib() -> ctypes.CDLL:
-    # compiles routing.c into a shared library under sim/out and loads it
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["gcc", "-std=c11", "-O2", "-shared", "-fPIC",
-                    str(ROUTING_DIR / "routing.c"), "-o", str(LIB_PATH)], check=True)
-    return ctypes.CDLL(str(LIB_PATH))
-
-
 # fields where the sim deliberately uses a different default than the boards (rt_default_config).
 # check_layout skips these; the rest still catch any shifted or wrong-size field
 SIM_DIFFERS_FROM_HW = {
@@ -247,7 +238,12 @@ def check_layout() -> bool:
     """Fills an RtConfig with C's rt_default_config and compares every field to RoutingParams.
     Every field has a distinct value, so a shifted or wrong-size field shows up as a mismatch.
     Fields in SIM_DIFFERS_FROM_HW are intentional differences and are skipped."""
-    lib = build_routing_lib()
+    # same build the sim uses (routing.c + shim.c), so this check can never leave a
+    # stripped-down librouting.so behind for the runner to pick up
+    import bindings                                       # imported here: bindings imports this file
+    bindings.build(force=True)
+    lib = bindings.load()
+    # run as a script, this file's RtConfig is a separate class from config.RtConfig, so set it here
     lib.rt_default_config.argtypes = [ctypes.POINTER(RtConfig), ctypes.c_uint32]
     c = RtConfig()
     lib.rt_default_config(ctypes.byref(c), 7)

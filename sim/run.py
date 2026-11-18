@@ -69,7 +69,13 @@ def main():
     if a.experiment not in exps:
         sys.exit(f"unknown experiment '{a.experiment}'. try --list")
 
-    bindings.build()                             # compile once here, not in every worker
+    # always compile fresh (under a second), so runs never use a stale librouting.so.
+    # then load it once here: if it's broken you get one clear error, not every worker failing
+    bindings.build(force=True)
+    try:
+        bindings.load()
+    except Exception as e:
+        sys.exit(f"can't load sim/out/librouting.so: {e}")
     runs = exps[a.experiment][: a.limit] if a.limit else exps[a.experiment]
     todo = [r for r in runs if a.force or not r.out_path.exists()]
     commit = _commit()
