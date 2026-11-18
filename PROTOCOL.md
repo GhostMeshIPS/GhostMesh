@@ -186,6 +186,7 @@ Every way a frame can be dropped or not relayed, with its log name (`rt_log_t` i
 | `RT_LOG_TOO_LONG` | send | laptop message over 152 bytes |
 | `RT_LOG_ENCRYPT_FAILED` | send | encryption failed (unknown recipient, or no keys yet) |
 | `RT_LOG_SEND_FAILED` | send | out of retries, laptop told the message failed |
+| `RT_LOG_PEER_EVICTED` | both | peer table full (`RT_MAX_PEERS`), least recently used peer forgotten. Safe while a node hears from fewer than 8 senders in any 15 s window (§9.7); if duplicates appear alongside it, that limit was hit |
 
 Normal (non-drop) events: `RT_LOG_RELAY_SCHEDULED`, `RT_LOG_TX`, `RT_LOG_DELIVERED`, `RT_LOG_REACK`, `RT_LOG_ACK_MATCHED`, `RT_LOG_ACK_UNMATCHED`.
 
