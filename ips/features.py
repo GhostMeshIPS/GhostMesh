@@ -89,6 +89,10 @@ def build_features(df):
     # (before windowing, so the first packet in a window still gets its gap).
     # Per node, not per MAC: with MACs rotating, a per-MAC gap would restart every minute.
     df["gap"] = df.groupby("node")["t"].diff()
+    # TTL on HELLOs only (0 for other packets). Honest HELLOs are one-hop and always carry TTL 1,
+    # whatever the network's default TTL is; DATA legitimately carries up to the default (16 in
+    # Rashad's sim), which would hide a fake TTL of 10 inside ttl_max.
+    df["hello_ttl"] = df["ttl"].where(df["type"] == "HELLO", 0)
 
     aggs = dict(
         pkt_count = ("t", "size"), #Packets this second
@@ -96,6 +100,7 @@ def build_features(df):
         rssi_mean = ("rssi", "mean"),
         rssi_std = ("rssi", "std"),
         ttl_max = ("ttl", "max"),
+        hello_ttl_max = ("hello_ttl", "max"),                       # 1 = honest; more = fake route advert
         hop_min = ("hop", "min"),
         gap_mean = ("gap", "mean"),
         link_fail = ("link_ok", lambda s: (~s.astype(bool)).sum()), #count of False

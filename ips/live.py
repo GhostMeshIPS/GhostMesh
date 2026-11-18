@@ -55,8 +55,12 @@ PRUNE_EVERY_S = 600                            # check the 6-hour log limit ever
 
 
 class LiveIPS:
-    def __init__(self, model, send_cmd, iforest=None):
+    def __init__(self, model, send_cmd, iforest=None, trusted=()):
         self.model = model                    # Random Forest: makes the decisions
+        # Boards that are never auto-blocked, only alerted on: the watchtower always, plus any node
+        # doubling as it (4-board setup: D is the watchtower). Blocking it would make the mesh
+        # ignore the watchtower itself, including its future BLOCKs and time beacons.
+        self.trusted = {WATCHTOWER, *trusted}
         self.iforest = iforest                # Isolation Forest: only logged, for the rule-vs-AI comparison
         self.send_cmd = send_cmd              # function that delivers a BLOCK (print, serial, ...)
         self.buffer = []                      # recent packets
@@ -83,8 +87,8 @@ class LiveIPS:
         # Stamp msg_id history first (relay vs. started it, how old, repeated?), even for the
         # watchtower's own frames: otherwise the first node relaying a beacon would look like its author.
         self.tracker.annotate(pkt)
-        if pkt["type"] == "BLOCK" or pkt.get("node") == WATCHTOWER:
-            return                            # the watchtower's own frames (BLOCKs, time beacons) aren't judged
+        if pkt.get("node") == WATCHTOWER:
+            return                            # the watchtower's own frames (CTRL: BLOCKs, time beacons) aren't judged
         # t = the packet's own timeline (used for all the maths);
         # offset turns it into real clock time for display ("wall" in the logs)
         self.offset = pkt.get("rx_t", pkt["t"]) - pkt["t"]
@@ -181,6 +185,11 @@ class LiveIPS:
         if attack in ALERT_ONLY:
             if first:
                 self.event(now, "ALERT", node, attack, "alert only (blocking would cut off the victim)",
+                           self.evidence(node))
+        elif attack in BLOCK_ATTACKS and node in self.trusted:
+            if first:
+                self.event(now, "ALERT", node, attack,
+                           "alert only: this board is the watchtower (trusted), so it is never blocked",
                            self.evidence(node))
         elif attack in BLOCK_ATTACKS and node not in self.blocks and node not in self.dismissed:
             # new attack, or still attacking after an old block expired
@@ -327,6 +336,8 @@ def main():
     parser.add_argument("--file", help="replay a .jsonl log")
     parser.add_argument("--port", help="watchtower serial port, e.g. /dev/tty.usbserial-0001")
     parser.add_argument("--speed", type=float, default=1.0, help="replay speed (10 = 10x faster)")
+    parser.add_argument("--trusted", nargs="*", default=[], metavar="NODE",
+                        help="nodes never auto-blocked, e.g. --trusted D when D doubles as the watchtower")
     args = parser.parse_args()
 
     # Start each run with empty logs so the dashboard shows only this run
@@ -347,7 +358,7 @@ def main():
         source = replay(args.file or "test_session.jsonl", speed=args.speed)
         send_cmd = lambda cmd: print("  -> would send:", json.dumps(cmd))   # no hardware yet
 
-    ips = LiveIPS(load_model(), send_cmd, iforest=load_iforest())
+    ips = LiveIPS(load_model(), send_cmd, iforest=load_iforest(), trusted=args.trusted)
     print("IPS running. Ctrl+C to stop.")
     try:
         for pkt in source:

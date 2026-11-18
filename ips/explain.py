@@ -39,6 +39,7 @@ EVIDENCE = {
     "orig_count":   ("new messages started/s",       "{:.0f}",   "up"),
     "hello_count":  ("HELLOs/s",                     "{:.0f}",   "up"),
     "ttl_max":      ("TTL",                          "{:.0f}",   "up"),
+    "hello_ttl_max": ("TTL on its HELLO beacons",    "{:.0f}",   "up"),
     "hop_min":      ("hop count",                    "{:.0f}",   "down"),
     "gap_mean":     ("gap between packets",          "{:.2f} s", "down"),
     "link_fail":    ("failed link checks",           "{:.0f}",   "up"),

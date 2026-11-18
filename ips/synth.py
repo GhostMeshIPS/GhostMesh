@@ -29,7 +29,7 @@ START_T = 1731264000.0   # fake Unix timestamp for t=0 (a whole minute, like a r
 EPOCH = 60               # every node changes pseudonym AND MAC on each Unix minute boundary
 ROTATION_GAP = 0.3       # seconds of silence after each boundary (changing MAC restarts Wi-Fi)
 
-DEFAULT_TTL = 4          # PLACEHOLDER until Rashad fixes it (PROTOCOL.md section 12 says TBD)
+DEFAULT_TTL = 16         # Rashad's sim value (PROTOCOL.md 12, includes +2 for hop padding); hardware still TBD
 HELLO_PERIOD = 2.0       # HELLO beacons ~every 2 s (0.5 Hz), never relayed
 JITTER = 0.2             # +/- wobble on each HELLO interval
 KEYS_PERIOD = 10.0       # each node floods its next-epoch key ~6 times a minute
@@ -224,12 +224,15 @@ class Mesh:
             t += 1 / rate
 
 
-def make_session(seed, duration, floods=(), routing=(), replays=(), unplug_b=None):
+def make_session(seed, duration, floods=(), routing=(), replays=(), unplug_b=None, x_off=False):
     """One labelled session. Times are seconds into the session.
     floods = [(rate, start, end), ...]; routing / replays = [(start, end), ...];
-    unplug_b = (start, end) when node B is switched off (harmless, must not be flagged)."""
+    unplug_b = (start, end) when node B is switched off (harmless, must not be flagged);
+    x_off = attacker board powered off the whole time (no traffic, no relaying)."""
     random.seed(seed)
     mesh = Mesh(duration)
+    if x_off:
+        mesh.down.append((ATTACKER, 0, duration))
     if unplug_b:
         mesh.down.append(("B", *unplug_b))
     mesh.normal_traffic()
@@ -250,8 +253,9 @@ def write_jsonl(packets, path):
 
 if __name__ == "__main__":
     sessions = {
-        # Clean traffic (incl. B unplugged for 40 s): what the Isolation Forest learns as "normal"
-        "normal_session1.jsonl":    dict(seed=42, duration=300, unplug_b=(150, 190)),
+        # Clean traffic (incl. B unplugged for 40 s): what the Isolation Forest learns as "normal".
+        # X powered OFF (Jose's request), so the anomaly model never learns the attacker's habits as normal.
+        "normal_session1.jsonl":    dict(seed=42, duration=300, unplug_b=(150, 190), x_off=True),
         # Same normal traffic + one loud or one slow flood
         "flood_session1.jsonl":     dict(seed=42, duration=300, unplug_b=(150, 190),
                                          floods=[(FLOOD_RATE, 120, 150)]),
