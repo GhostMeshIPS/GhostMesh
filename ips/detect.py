@@ -25,7 +25,9 @@ FEATURES = ["pkt_count", "hello_count", "rssi_mean", "rssi_std",
             "hello_ttl_max",  # TTL on HELLOs: honest = 1 whatever the default TTL, so a fake route stands out
             "orig_count",     # messages it started itself: separates a flooder from the relays passing it on
             "stale_count",    # msg_ids first heard > 60 s ago: replay
-            "dup_tx_count"]   # msg_ids it had already sent: replay
+            "dup_tx_count",   # msg_ids it had already sent: replay
+            "rssi_dev_max",   # jump from this identity's usual signal: spoof (a second radio)
+            "mac_count"]      # MACs behind one identity in one second: spoof without a copied MAC
 
 RF_PATH = "models/rf.joblib"            # where the trained Random Forest is saved for live.py
 IF_PATH = "models/iforest.joblib"       # trained Isolation Forest (for the rule-vs-AI comparison)

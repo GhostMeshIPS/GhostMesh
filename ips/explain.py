@@ -29,6 +29,8 @@ ATTACK_TEXT = {
                 "so it looks like the best path and other nodes send their messages through it"),
     "replay":  "replay: re-sending old captured packets",
     "spoof":   "spoofing: pretending to be another node",
+    "keys_missing": ("missing key updates: its encryption key updates stopped arriving while it is "
+                     "still transmitting, which can mean someone is jamming them"),
 }
 
 # Features that make good evidence: plain-English name, number format, and which direction is
@@ -45,6 +47,8 @@ EVIDENCE = {
     "link_fail":    ("failed link checks",           "{:.0f}",   "up"),
     "stale_count":  ("old messages re-sent/s",       "{:.0f}",   "up"),
     "dup_tx_count": ("its own messages repeated/s",  "{:.0f}",   "up"),
+    "rssi_dev_max": ("signal jump from its usual level", "{:.0f} dB", "up"),
+    "mac_count":    ("radio addresses using its identity", "{:.0f}", "up"),
 }
 
 
@@ -74,9 +78,12 @@ def build_facts(event, baseline, block_seconds):
     """Turn an IPS event into a small, SAFE set of facts for the LLM.
     Only our own labels and numbers: the attacker can't put words in here."""
     ev = event["evidence"]
+    who = NODE_NAMES.get(event["node"], "an unknown radio")         # never the raw pseudonym or MAC
+    if event["attack"] == "spoof":
+        who = f"a radio pretending to be {who}"                     # the named node is the VICTIM
     return {
         "action": "blocked" if event["kind"] == "BLOCK" else "raised an alert about",
-        "who": NODE_NAMES.get(event["node"], "an unknown radio"),   # never the raw pseudonym or MAC
+        "who": who,
         "attack": ATTACK_TEXT.get(event["attack"], "suspicious behaviour"),
         "evidence": [f"{label} was {x} (normal is {base})"
                      for label, x, base in top_evidence(ev["features"], baseline)],

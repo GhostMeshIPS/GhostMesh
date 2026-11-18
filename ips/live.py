@@ -25,10 +25,10 @@ import pandas as pd
 
 from detect import FEATURES, IF_PATH, RF_PATH, iforest_detect, rule_detect, train_rf
 from explain import EVIDENCE, explain
-from features import WINDOW, MsgIdTracker, build_features
+from features import WINDOW, PacketTracker, build_features
 from ingest import open_serial, replay, read_file, serial_stream
 from retention import WINDOWS_MAX_AGE_S, prune_jsonl
-from schema import WATCHTOWER, encode_cmd, make_block_cmd, make_unblock_cmd
+from schema import NODE_IDS, WATCHTOWER, encode_cmd, make_block_cmd, make_unblock_cmd
 
 BUFFER_SECONDS = 10   # recent history kept in memory (needed for gaps across windows)
 CONFIRM_WINDOWS = 2   # attack must be seen in this many windows in a row before acting
@@ -44,6 +44,14 @@ ALERT_ONLY = {"spoof"}                           # blocking a spoofed ID would c
 # (pseudo, MAC) pair seen on air if they confirm.
 RSSI_JUMP_DB = 6.0        # boards sit still, so honest RSSI stays within a few dB (synthetic noise: 2 dB)
 RSSI_HISTORY_MIN = 10     # need at least this many normal windows before trusting a node's baseline
+
+# Missing KEYS (Jose's decision 10e / open issue O18). Each node floods its next-epoch key ~every
+# 10 s (~6 a minute). A node that is clearly alive but whose KEYS stop arriving may be the target
+# of a jammer that reacts to frame type. A BLOCK can't stop a jammer, so this is an ALERT only.
+# A simple rule, not ML: there's no attacker transmitting anything to learn from.
+KEYS_WINDOW_S = 60        # look back this far
+KEYS_MIN = 2              # fewer KEYS than this in KEYS_WINDOW_S from an active node -> alert
+ACTIVE_GAP_S = 10         # silent longer than this = the node was off; its "active for a minute" clock restarts
 
 WINDOWS_LOG = "data/live_windows.jsonl"
 EVENTS_LOG = "data/live_events.jsonl"
@@ -64,7 +72,7 @@ class LiveIPS:
         self.iforest = iforest                # Isolation Forest: only logged, for the rule-vs-AI comparison
         self.send_cmd = send_cmd              # function that delivers a BLOCK (print, serial, ...)
         self.buffer = []                      # recent packets
-        self.tracker = MsgIdTracker()         # remembers msg_ids for 3 minutes (replays come late)
+        self.tracker = PacketTracker()        # remembers msg_ids (3 min) and each node's usual signal
         self.current_window = None
         self.streak = defaultdict(int)        # node -> attack windows in a row
         self.streak_rows = defaultdict(list)  # node -> the windows in the current streak (the evidence)
@@ -77,6 +85,10 @@ class LiveIPS:
         self.recent_normal = deque(maxlen=300)   # recent normal windows: "what normal looks like"
         # node -> its recent normal signal strengths. Only possible now that `node` doesn't rotate.
         self.rssi_history = defaultdict(lambda: deque(maxlen=120))
+        self.keys_seen = defaultdict(deque)   # node -> times it STARTED a KEYS flood (not relays)
+        self.active_since = {}                # node -> when it last came on (after a silence)
+        self.last_heard = {}                  # node -> time of its last packet
+        self.keys_alerted = set()             # nodes with an open missing-KEYS alert (alert once per episode)
         self.offset = 0.0                     # real clock time minus packet time (t), from rx_t
         self.last_prune = 0.0
         # One background worker for the LLM, so a slow explanation never delays a BLOCK
@@ -98,15 +110,43 @@ class LiveIPS:
         if w > self.current_window:           # the previous window is complete
             self.close_window(self.current_window, now=pkt["t"])
             self.current_window = w
+        self.note_activity(pkt)
         self.buffer.append(pkt)
         # forget packets older than BUFFER_SECONDS
         cutoff = pkt["t"] - BUFFER_SECONDS
         while self.buffer and self.buffer[0]["t"] < cutoff:
             self.buffer.pop(0)
 
+    def note_activity(self, pkt):
+        """Bookkeeping for the missing-KEYS check: who is alive, and when they started KEYS floods."""
+        node, t = pkt.get("node"), pkt["t"]
+        if node not in NODE_IDS:              # only our known boards ("?" radios have no KEYS duty)
+            return
+        if t - self.last_heard.get(node, -1e9) > ACTIVE_GAP_S:
+            self.active_since[node] = t       # it was off (or is new): give it a full minute first
+        self.last_heard[node] = t
+        if pkt["type"] == "KEYS" and pkt.get("first_copy"):
+            self.keys_seen[node].append(t)
+
+    def check_keys(self, now):
+        """ALERT once when an active node's KEYS frames stop arriving; re-arm when they come back."""
+        for node, since in self.active_since.items():
+            seen = self.keys_seen[node]
+            while seen and seen[0] < now - KEYS_WINDOW_S:
+                seen.popleft()
+            active = now - self.last_heard[node] <= ACTIVE_GAP_S and now - since >= KEYS_WINDOW_S
+            if active and len(seen) < KEYS_MIN and node not in self.keys_alerted:
+                self.keys_alerted.add(node)
+                self.event(now, "ALERT", node, "keys_missing",
+                           f"only {len(seen)} key update(s) in the last {KEYS_WINDOW_S} s (expected ~6) while it "
+                           f"is still transmitting: possible jamming aimed at its KEYS frames")
+            elif len(seen) >= KEYS_MIN:
+                self.keys_alerted.discard(node)
+
     def close_window(self, w, now):
         self.process_commands(now)            # operator clicks from the dashboard (at most ~1 s old)
         self.expire_blocks(now)
+        self.check_keys(now)
         wall_now = now + self.offset
         if wall_now - self.last_prune > PRUNE_EVERY_S:  # keep only the last 6 hours of windows
             prune_jsonl(WINDOWS_LOG, "wall", WINDOWS_MAX_AGE_S, now=wall_now)

@@ -61,6 +61,7 @@ ROUTING_RATE = 5         # fake HELLOs per second (normal: 0.5/s)
 ROUTING_FAKE_TTL = 10    # honest HELLOs use TTL 1
 REPLAY_RATE = 2          # replayed frames per second
 REPLAY_AGE = (120, 170)  # replayed frames were captured this many seconds earlier
+SPOOF_RATE = 2           # messages per second X sends while pretending to be a victim
 
 
 def identity(node, t):
@@ -113,13 +114,20 @@ class Mesh:
         self.duration = duration
         self.packets = []
         self.down = []                        # (node, start, end): unplugged during that time
+        self.jam_keys = []                    # (node, start, end): its KEYS frames are jammed
         self.accepted = defaultdict(int)      # (relay, transmitter, second) -> new msg_ids accepted
 
     def is_down(self, node, t):
         return any(n == node and s <= t - START_T < e for n, s, e in self.down)
 
-    def flood(self, t0, origin, ptype, label="normal", pad=True):
+    def keys_jammed(self, node, t):
+        """A jammer that reacts to frame type wipes out this node's KEYS frames (O18), nothing else."""
+        return any(n == node and s <= t - START_T < e for n, s, e in self.jam_keys)
+
+    def flood(self, t0, origin, ptype, label="normal", pad=True, as_node=None, copy_mac=False):
         """Send one message from `origin` and let the mesh relay it.
+        as_node: the origin transmits WEARING that node's identity (spoofing): its pseudonym, so the
+        watchtower tags it as that node; and its MAC too if copy_mac, else the origin's own MAC.
         Returns {node: time it first heard the message} (used to time ACKs)."""
         if self.is_down(origin, t0):
             return {}
@@ -134,8 +142,12 @@ class Mesh:
             t, tx, ttl, hop = queue.pop(0)
             if in_rotation_gap(t):
                 continue                      # this transmission is lost in the outage
+            disguise = {}
+            if tx == origin and as_node:
+                fake_pseudo, fake_mac = identity(as_node, t)
+                disguise = dict(pseudo=fake_pseudo, node_tag=as_node, mac=fake_mac if copy_mac else None)
             self.packets.append(make_packet(t, tx, ptype, ttl, hop, msg_id,
-                                            label if tx == origin else "normal"))
+                                            label if tx == origin else "normal", **disguise))
             if ttl == 0:
                 continue                      # out of hops: nobody relays it further
             for nb in sorted(TOPOLOGY[tx]):   # sorted: same order every run (sets aren't ordered)
@@ -168,7 +180,8 @@ class Mesh:
                 t += HELLO_PERIOD + random.uniform(-JITTER, JITTER)
             t = START_T + random.uniform(0, KEYS_PERIOD)            # KEYS: flooded like DATA
             while t < end:
-                self.flood(t, node, "KEYS")
+                if not self.keys_jammed(node, t):
+                    self.flood(t, node, "KEYS")
                 t += KEYS_PERIOD + random.uniform(-1, 1)
         t = START_T + random.uniform(0, BEACON_PERIOD)              # watchtower TIME beacon
         while t < end:
@@ -201,6 +214,15 @@ class Mesh:
                                             new_msg_id(), label="routing"))
             t += 1 / rate
 
+    def spoof_attack(self, victim, start, end, copy_mac=False, rate=SPOOF_RATE):
+        """X sends messages wearing `victim`'s identity (insider only: it needs the network key).
+        The watchtower tags them as the victim, so one "node" suddenly has two signal levels,
+        and two MACs unless X copied the victim's MAC too. Relays pass them on as usual."""
+        t = START_T + start
+        while t < START_T + end:
+            self.flood(t, ATTACKER, "DATA", label="spoof", as_node=victim, copy_mac=copy_mac)
+            t += 1 / rate
+
     def replay_attack(self, start, end, rate=REPLAY_RATE):
         """X re-sends frames it overheard 2-3 minutes earlier, unchanged.
 
@@ -224,15 +246,20 @@ class Mesh:
             t += 1 / rate
 
 
-def make_session(seed, duration, floods=(), routing=(), replays=(), unplug_b=None, x_off=False):
+def make_session(seed, duration, floods=(), routing=(), replays=(), unplug_b=None, x_off=False, spoofs=(),
+                 jam_keys=()):
     """One labelled session. Times are seconds into the session.
     floods = [(rate, start, end), ...]; routing / replays = [(start, end), ...];
+    spoofs = [(victim, start, end, copy_mac), ...];
+    jam_keys = [(node, start, end), ...]: that node's KEYS frames never get through (labels stay
+    "normal": the node itself isn't misbehaving; live.py's missing-KEYS check alerts on it);
     unplug_b = (start, end) when node B is switched off (harmless, must not be flagged);
     x_off = attacker board powered off the whole time (no traffic, no relaying)."""
     random.seed(seed)
     mesh = Mesh(duration)
     if x_off:
         mesh.down.append((ATTACKER, 0, duration))
+    mesh.jam_keys.extend(jam_keys)
     if unplug_b:
         mesh.down.append(("B", *unplug_b))
     mesh.normal_traffic()
@@ -240,6 +267,8 @@ def make_session(seed, duration, floods=(), routing=(), replays=(), unplug_b=Non
         mesh.flood_attack(rate, start, end)
     for start, end in routing:
         mesh.routing_attack(start, end)
+    for victim, start, end, copy_mac in spoofs:
+        mesh.spoof_attack(victim, start, end, copy_mac)
     for start, end in replays:                # after normal traffic: it replays what it overheard
         mesh.replay_attack(start, end)
     return sorted(mesh.packets, key=lambda p: p["t"])
@@ -264,11 +293,16 @@ if __name__ == "__main__":
         # Random Forest training: floods at several rates, routing, replay, B unplugged
         "train_session.jsonl":      dict(seed=42, duration=600,
                                          floods=[(30, 40, 60), (20, 100, 120), (10, 160, 180), (5, 220, 240)],
-                                         routing=[(300, 330)], replays=[(420, 450)], unplug_b=(480, 520)),
-        # Unseen test: different seed and timings, and a flood rate (8/s) not in training
+                                         routing=[(300, 330)], replays=[(420, 450)], unplug_b=(480, 520),
+                                         # spoof A (own MAC, 7 dB louder) and C (copied MAC, 12 dB louder)
+                                         spoofs=[("A", 360, 390, False), ("C", 540, 570, True)]),
+        # Unseen test: different seed and timings, a flood rate (8/s) not in training, and a spoof of
+        # B, whose usual signal is only 5 dB from X's (harder than the 7 and 12 dB seen in training)
         "test_session.jsonl":       dict(seed=7, duration=300,
                                          routing=[(60, 90)], unplug_b=(100, 140),
-                                         floods=[(SLOW_FLOOD_RATE, 150, 180)], replays=[(230, 260)]),
+                                         floods=[(SLOW_FLOOD_RATE, 150, 180)], replays=[(230, 260)],
+                                         spoofs=[("B", 265, 295, False)],
+                                         jam_keys=[("C", 170, 260)]),       # C's KEYS jammed for 90 s
     }
     for path, kw in sessions.items():
         packets = make_session(**kw)
