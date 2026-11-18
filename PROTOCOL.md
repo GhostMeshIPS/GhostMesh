@@ -420,7 +420,7 @@ _Owner: Rashad + Jose_
 | Neighbor expiry | TBD | |
 | ACK timeout / retries / backoff | TBD | |
 | Epoch length | 60 s | `floor(unix_s / 60) mod 65536` (§9.2) |
-| Jitter random share | TBD | Start at 25%; sweep 12% / 25% / 50% in sim |
+| Jitter random share | 50% | From the sim's `jitter_sweep` (50 nodes, 1000 kbps, commit `71f7fd0`): fewest collisions of 12 / 25 / 50% with the same delivery, at a small cost in median latency. The 20 ms random part is still 2–3 frame airtimes at 300 kbps (§5.3 timing rule) |
 | Accepted epoch window | ±1 epoch | §9.2 |
 | Pre-sync send queue | 8 messages | Rejected when full (§9.2) |
 | TIME beacon interval | 10 s | Watchtower; alert after 30 s without one (§9.2) |

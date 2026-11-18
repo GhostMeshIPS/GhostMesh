@@ -89,7 +89,7 @@ class RoutingParams:
     default_ttl: int = 16              # still TBD at the freeze
     hop_pad_max: int = 2
     k: int = 2
-    jitter_rand_pct: int = 25
+    jitter_rand_pct: int = 50
     jitter_min_ms: int = 10
     jitter_max_ms: int = 50
     rssi_weak: int = -90
@@ -236,9 +236,17 @@ def build_routing_lib() -> ctypes.CDLL:
     return ctypes.CDLL(str(LIB_PATH))
 
 
+# fields where the sim deliberately uses a different default than the boards (rt_default_config).
+# check_layout skips these; the rest still catch any shifted or wrong-size field
+SIM_DIFFERS_FROM_HW = {
+    "default_ttl": "sim uses 16 so 50-node meshes are reachable (ttl_sweep); boards keep 5",
+}
+
+
 def check_layout() -> bool:
     """Fills an RtConfig with C's rt_default_config and compares every field to RoutingParams.
-    Every field has a distinct value, so a shifted or wrong-size field shows up as a mismatch."""
+    Every field has a distinct value, so a shifted or wrong-size field shows up as a mismatch.
+    Fields in SIM_DIFFERS_FROM_HW are intentional differences and are skipped."""
     lib = build_routing_lib()
     lib.rt_default_config.argtypes = [ctypes.POINTER(RtConfig), ctypes.c_uint32]
     c = RtConfig()
@@ -247,6 +255,8 @@ def check_layout() -> bool:
     want = to_rt_config(RoutingParams(), 7)
     bad = []
     for name, _ in RtConfig._fields_:
+        if name in SIM_DIFFERS_FROM_HW:
+            continue
         got, exp = getattr(c, name), getattr(want, name)
         if name == "retry_backoff_ms":
             got, exp = list(got), list(exp)

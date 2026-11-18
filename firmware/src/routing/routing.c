@@ -61,7 +61,7 @@ void rt_default_config(rt_config_t *cfg, uint32_t node_id)
     cfg->default_ttl          = 5;
     cfg->hop_pad_max          = 2;
     cfg->k                    = 2;
-    cfg->jitter_rand_pct      = 25;
+    cfg->jitter_rand_pct      = 50;
     cfg->jitter_min_ms        = 10;
     cfg->jitter_max_ms        = 50;
     cfg->rssi_weak            = -90;
