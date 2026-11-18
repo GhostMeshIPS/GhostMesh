@@ -442,10 +442,19 @@ _Owner: Rashad + Jose_
 
 _Owner: Rashad_
 
-- Transmission
-- Delivery
-- Reroute time
-- Latency
+**Transmission:** every frame a node puts on the air, including originals, relays, ACKs, ACK relays and retries, whether or not it collided. Relays cancelled by k-suppression are not transmissions. Control traffic (KEYS, CTRL, HELLO) is counted and reported separately.
+
+**Sent:** a laptop message accepted by `rt_send` (a non-zero handle). Messages rejected at send time (too long, not synced, table full) are not sent and are reported separately.
+
+**Delivered:** the first time a sent message reaches its recipient's laptop. Counted once per message, no matter how many attempts or copies arrive.
+
+**Delivery ratio:** delivered ÷ sent. A message still undelivered when the run ends (traffic window plus drain time) counts as not delivered.
+
+**Latency:** time from the sender's `rt_send` call to delivery at the recipient, for delivered messages only. Includes any time spent on retries. Reported as median and 95th percentile, not just the mean.
+
+**Transmissions per delivered message:** total transmissions in the run (including those spent on messages that failed) ÷ number of messages delivered.
+
+**Reroute time:** _TBD (needed for the unplug-B test)._
 
 ## 14. Open questions
 
