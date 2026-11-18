@@ -385,6 +385,23 @@ different channels and adds downtime at each boundary. **Documenting them is a d
 model that names its limits is more credible to judges than one that hides them, and each one has a
 named future-work path.
 
+**12c IPS block policy for spoof-like evidence (O9).** Hannan's `ips/live.py` policy, adopted as-is.
+
+| Option | Why not / why |
+|---|---|
+| Auto-block the whole node | A spoofer copying A's identity would get the real A blocked in every epoch: our own defense ejects an honest node (N4, N7) |
+| Alert only, never block on spoof | Safest for honest nodes, but the IPS could then never stop a spoofer, which weakens G6 for one of the four demo attacks |
+| **Operator confirms, block only the (pseudo, MAC) pair** (chosen) | Keeps prevention (N4) while a human, not a threshold, decides when evidence is ambiguous. The pair block also spares the victim whenever the spoofer's MAC differs (8b match rule). It was already built and tested on synthetic sessions, so it costs nothing this week (N6). Residual: a full pseudo+MAC copy is the same pair, so RSSI and the operator are the only separation |
+
+**12d Unkeyed KEYS `conf` hashes (O23): accept and document.** `conf` is an unkeyed hash of a public value
+(each node's cleartext `next_pk`), so, like a CRC, anyone can recompute it. Here that lets a sniffer match hashes
+and learn who holds pair keys with whom; it can't forge anything, because `conf` is inside the keyed `tag`.
+
+| Option | Why not / why |
+|---|---|
+| Key `conf` with the pair key now | Cheap (one hash call, no frame change), but it changes `gm_ratchet.c` and its tests days before the feature freeze for no gain in our deployment (N6, N7) |
+| **Accept and document** (chosen) | keygen makes every node a peer of every other, so the key graph is complete and reveals nothing about who talks to whom. What's left is per-node peer counts (≈ the node count already visible, O22) and a little reachability, which flooding makes nearly meaningless. The leak only matters if provisioning becomes partial (groups), so keyed `conf` is recorded as future work with that trigger |
+
 ---
 
 ## 13. Crypto library: Monocypher 4.0.2

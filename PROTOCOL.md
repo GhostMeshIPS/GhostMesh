@@ -375,9 +375,15 @@ Documented, not fixed:
 - On a quiet mesh, timing can still reveal who originated a message and pair senders with recipients (O1/O2 residual).
 - RSSI can track static boards across epochs (O3).
 - The network's existence is visible (O7).
-- An attacker spoofing a node completely can trick the IPS into blocking that real node (O9, open).
-- No key fingerprint check, no network-key revocation, keys unencrypted in flash, unauthenticated serial ports,
-  and a single jammable channel (O13–O17, open).
+- The SOS bit in `flags` is cleartext (6d).
+- An attacker copying a node's pseudonym **and** MAC can only be told apart by RSSI and the operator. The IPS never
+  auto-blocks on spoof-like evidence; the operator confirms and only the (pseudo, MAC) pair is blocked (O9, closed by 12c).
+- No network-key revocation, keys unencrypted in flash, unauthenticated serial ports, and a single jammable
+  channel (O14–O17, accepted in 12a). Key fingerprints are checked at boot (O13, closed by 15).
+- Open: in the 4-board setup relay D also holds the watchtower's secrets (O21); HELLO/KEYS cadence reveals how many
+  nodes are active (O22).
+- KEYS `conf` hashes are unkeyed, so a sniffer can recover the pair-key graph. With all-to-all provisioning it is
+  complete and adds only peer counts (O23, accepted in 12d; keyed `conf` is future work).
 - No protection against an attacker who holds a stolen chain or static key and actively forges KEYS frames.
 - Not quantum-resistant.
 
