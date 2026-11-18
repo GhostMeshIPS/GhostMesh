@@ -86,7 +86,7 @@ class TopologyConfig:
 
 @dataclass(frozen=True)
 class RoutingParams:
-    default_ttl: int = 5              # still TBD at the freeze
+    default_ttl: int = 16              # still TBD at the freeze
     hop_pad_max: int = 2
     k: int = 2
     jitter_rand_pct: int = 25
@@ -222,7 +222,7 @@ def experiments(seeds: int = SEEDS) -> dict:
         # does a bigger TTL fix delivery in big meshes? (default_ttl includes the +2 for hop padding)
         "ttl_sweep": _grid("ttl_sweep", base, seeds,
                            **{"topology.n_nodes": [20, 50],
-                              "routing.default_ttl": [5, 8, 12]}),
+                              "routing.default_ttl": [5, 8, 12, 14, 16]}),
     }
 
 
