@@ -2,7 +2,7 @@
 
 _Owner: Rashad_
 
-These are the results from the Python sim running the real `routing.c` (the same code that goes on the boards). Everything here comes from commit `72c8408`, except `jitter_sweep`, which reused its runs from `71f7fd0` (same routing code, only the default changed). Metric definitions are in `PROTOCOL.md` §13.
+These are the results from the Python sim running the real `routing.c` (the same code that goes on the boards). Everything here comes from commit `5eebe0f`. Metric definitions are in `PROTOCOL.md` §13.
 
 All 30 plots are in [`figures/`](figures/). The ones that matter most are shown in each section below.
 
@@ -11,7 +11,7 @@ All 30 plots are in [`figures/`](figures/). The ones that matter most are shown 
 The sim builds a random mesh (nodes dropped in a square, linked if they're in radio range) and runs the actual C routing code on every node through `ctypes`. Only the routing is real. The crypto is a stand-in, since we're measuring forwarding, not encryption.
 
 The radio model has:
-- **Airtime per frame:** a 192 µs preamble plus (240 + 43) bytes at the channel's bit rate
+- **Airtime per frame:** a 192 µs preamble plus (240 + 43) bytes at the channel's bit rate, which is 2.46 ms at 1 Mbps. Yunus measured 2.46 ms on the boards too, so the sim's airtime matches the hardware. 
 - **Collisions:** a frame is lost if another frame overlaps it at the receiver, or if the receiver is transmitting at the same time
 - **Carrier sense:** a node waits until the channel it hears is quiet, plus a short random backoff
 
@@ -146,7 +146,7 @@ This shows that more randomness keeps nodes with similar signal strength from tr
 
 - **Crypto is a stand-in.** The sim doesn't model encryption time or KEYS / CTRL traffic, so real meshes will carry a bit of extra background traffic.
 
-- **The radio model is simple.** Collisions are all-or-nothing (no capture effect), and the 43-byte overhead, 192 µs preamble, and RSSI path-loss numbers are estimates that should get checked against the boards.
+- **The radio model is simple.** Collisions are all-or-nothing (no capture effect), and the RSSI path-loss numbers are estimates. Airtime is checked against the boards (2.46 ms at 1 Mbps, and every frame on the boards went out at 1 Mbps). The boards’ airtime_avg_us counter reads higher (~3.2–3.3 ms) because it times esp_now_send to the send callback, which includes waiting for the channel. The sim models that wait separately with carrier sense.
 
 - **Collisions are counted per reception,** so one transmission heard by 5 neighbors can count up to 5 times. Compare them across settings, not as absolute numbers.
 
