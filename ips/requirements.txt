@@ -1,4 +1,5 @@
-# GhostMesh IPS: pinned versions that are tested together (Python 3.11+)
+# GhostMesh IPS: pinned versions that are tested together. Tested on Python 3.14.2 (macOS);
+# older Pythons are untested. requirements-lock.txt pins every dependency too (most reproducible).
 pandas==3.1.1
 numpy==2.5.4
 scikit-learn==1.9.1

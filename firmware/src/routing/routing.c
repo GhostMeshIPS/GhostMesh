@@ -61,7 +61,7 @@ void rt_default_config(rt_config_t *cfg, uint32_t node_id)
     cfg->default_ttl          = 5;
     cfg->hop_pad_max          = 2;
     cfg->k                    = 2;
-    cfg->jitter_rand_pct      = 25;
+    cfg->jitter_rand_pct      = 50;
     cfg->jitter_min_ms        = 10;
     cfg->jitter_max_ms        = 50;
     cfg->rssi_weak            = -90;
@@ -626,22 +626,34 @@ static void retry_fire(rt_node_t *n, int out_slot)
 
 /* ---- Peers + sequence numbers (§9.7) ------------------------------------ */
 
-// finds a peer, or adds it if there's room. new peers start their send seq at a random value
+// finds a peer, or adds it. new peers start their send seq at a random value.
+// when the table is full, the least recently used peer gets forgotten. that's safe because
+// a recipient only needs 15 s of seq memory (§9.7), so a peer that's been quiet longer has nothing to lose
 static rt_peer_t *peer_get(rt_node_t *n, uint32_t peer_id)
 {
-    for(int i = 0; i < RT_MAX_PEERS; i++){
-        if(n->peers[i].used && n->peers[i].peer_id == peer_id) return &n->peers[i];
-    }
+    uint32_t now = n->p->now_ms(n->ctx);
+    rt_peer_t *victim = NULL;
+    uint32_t oldest_age = 0;
+
     for(int i = 0; i < RT_MAX_PEERS; i++){
         rt_peer_t *p = &n->peers[i];
-        if(p->used) continue;
-        memset(p, 0, sizeof *p);
-        p->used = true;
-        p->peer_id = peer_id;
-        p->next_seq_tx = n->p->random_u32(n->ctx);
-        return p;
+        if(p->used && p->peer_id == peer_id){                        // already known
+            p->last_used_ms = now;
+            return p;
+        }
+        uint32_t age = p->used ? now - p->last_used_ms : UINT32_MAX; // free slots count as oldest
+        if(!victim || age > oldest_age){ victim = p; oldest_age = age; }
     }
-    return NULL;                                                     // table full
+
+    //table full: forget the least recently used peer (logged so the sim can count it)
+    if(victim->used) n->p->log(n->ctx, RT_LOG_PEER_EVICTED, NULL);
+
+    memset(victim, 0, sizeof *victim);
+    victim->used = true;
+    victim->peer_id = peer_id;
+    victim->next_seq_tx = n->p->random_u32(n->ctx);
+    victim->last_used_ms = now;
+    return victim;
 }
 
 // was this seq delivered from this peer in the last seq_memory_ms?

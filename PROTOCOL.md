@@ -186,6 +186,7 @@ Every way a frame can be dropped or not relayed, with its log name (`rt_log_t` i
 | `RT_LOG_TOO_LONG` | send | laptop message over 152 bytes |
 | `RT_LOG_ENCRYPT_FAILED` | send | encryption failed (unknown recipient, or no keys yet) |
 | `RT_LOG_SEND_FAILED` | send | out of retries, laptop told the message failed |
+| `RT_LOG_PEER_EVICTED` | both | peer table full (`RT_MAX_PEERS`), least recently used peer forgotten. Safe while a node hears from fewer than 8 senders in any 15 s window (§9.7); if duplicates appear alongside it, that limit was hit |
 
 Normal (non-drop) events: `RT_LOG_RELAY_SCHEDULED`, `RT_LOG_TX`, `RT_LOG_DELIVERED`, `RT_LOG_REACK`, `RT_LOG_ACK_MATCHED`, `RT_LOG_ACK_UNMATCHED`.
 
@@ -375,9 +376,15 @@ Documented, not fixed:
 - On a quiet mesh, timing can still reveal who originated a message and pair senders with recipients (O1/O2 residual).
 - RSSI can track static boards across epochs (O3).
 - The network's existence is visible (O7).
-- An attacker spoofing a node completely can trick the IPS into blocking that real node (O9, open).
-- No key fingerprint check, no network-key revocation, keys unencrypted in flash, unauthenticated serial ports,
-  and a single jammable channel (O13–O17, open).
+- The SOS bit in `flags` is cleartext (6d).
+- An attacker copying a node's pseudonym **and** MAC can only be told apart by RSSI and the operator. The IPS never
+  auto-blocks on spoof-like evidence; the operator confirms and only the (pseudo, MAC) pair is blocked (O9, closed by 12c).
+- No network-key revocation, keys unencrypted in flash, unauthenticated serial ports, and a single jammable
+  channel (O14–O17, accepted in 12a). Key fingerprints are checked at boot (O13, closed by 15).
+- Open: in the 4-board setup relay D also holds the watchtower's secrets (O21); HELLO/KEYS cadence reveals how many
+  nodes are active (O22).
+- KEYS `conf` hashes are unkeyed, so a sniffer can recover the pair-key graph. With all-to-all provisioning it is
+  complete and adds only peer counts (O23, accepted in 12d; keyed `conf` is future work).
 - No protection against an attacker who holds a stolen chain or static key and actively forges KEYS frames.
 - Not quantum-resistant.
 
@@ -403,17 +410,17 @@ _Owner: Rashad + Jose_
 | Parameter | Value | Notes |
 |---|---|---|
 | Default TTL (hardware) | TBD | |
-| Default TTL (sim) | TBD | |
+| Default TTL (sim) | 16 | From the sim's `ttl_sweep` (commit `72c8408`): 50-node meshes need 14–16 to reach almost everyone, 20 nodes are already saturated at 12. Includes the +2 for hop padding. See `docs/results/sim-results.md` |
 | Seen-cache size | TBD | |
 | Seen-cache expiry | TBD | |
 | Relay jitter window | TBD | Planned 10–50 ms. Must be at least 2–3× the airtime of k frames |
-| Suppression threshold k | TBD | Proposed 2–3; settle by sim sweep |
+| Suppression threshold k | 2 | From the sim's `k_sweep` (50 nodes, 300 and 1000 kbps, commit `72c8408`): k = 1 loses messages to coverage holes; k = 3 cuts tail latency but costs more transmissions and collisions. See `docs/results/sim-results.md` |
 | Frame airtime | TBD | Estimated ~3 ms per 240-byte frame at 1 Mbps; measure on hardware later |
 | HELLO interval | TBD | |
 | Neighbor expiry | TBD | |
 | ACK timeout / retries / backoff | TBD | |
 | Epoch length | 60 s | `floor(unix_s / 60) mod 65536` (§9.2) |
-| Jitter random share | TBD | Start at 25%; sweep 12% / 25% / 50% in sim |
+| Jitter random share | 50% | From the sim's `jitter_sweep` (50 nodes, 1000 kbps, commit `71f7fd0`): fewest collisions of 12 / 25 / 50% with the same delivery, at a small cost in median latency. The 20 ms random part is still 2–3 frame airtimes at 300 kbps (§5.3 timing rule) |
 | Accepted epoch window | ±1 epoch | §9.2 |
 | Pre-sync send queue | 8 messages | Rejected when full (§9.2) |
 | TIME beacon interval | 10 s | Watchtower; alert after 30 s without one (§9.2) |
@@ -436,10 +443,19 @@ _Owner: Rashad + Jose_
 
 _Owner: Rashad_
 
-- Transmission
-- Delivery
-- Reroute time
-- Latency
+**Transmission:** every frame a node puts on the air, including originals, relays, ACKs, ACK relays and retries, whether or not it collided. Relays cancelled by k-suppression are not transmissions. Control traffic (KEYS, CTRL, HELLO) is counted and reported separately.
+
+**Sent:** a laptop message accepted by `rt_send` (a non-zero handle). Messages rejected at send time (too long, not synced, table full) are not sent and are reported separately.
+
+**Delivered:** the first time a sent message reaches its recipient's laptop. Counted once per message, no matter how many attempts or copies arrive.
+
+**Delivery ratio:** delivered ÷ sent. A message still undelivered when the run ends (traffic window plus drain time) counts as not delivered.
+
+**Latency:** time from the sender's `rt_send` call to delivery at the recipient, for delivered messages only. Includes any time spent on retries. Reported as median and 95th percentile, not just the mean.
+
+**Transmissions per delivered message:** total transmissions in the run (including those spent on messages that failed) ÷ number of messages delivered.
+
+**Reroute time:** _TBD (needed for the unplug-B test)._
 
 ## 14. Open questions
 

@@ -85,6 +85,7 @@ typedef enum {
     RT_LOG_TOO_LONG,
     RT_LOG_ENCRYPT_FAILED,
     RT_LOG_SEND_FAILED,           // out of retries
+    RT_LOG_PEER_EVICTED,          // peer table full: least recently used peer forgotten
 } rt_log_t;
 
 typedef enum { RT_STATUS_SENT, RT_STATUS_DELIVERED, RT_STATUS_FAILED } rt_status_t;
@@ -183,6 +184,7 @@ typedef struct {
     bool          used;
     uint32_t      peer_id;         // real node ID
     uint32_t      next_seq_tx;     // next seq when sending to this peer (random start, §9.7)
+    uint32_t      last_used_ms;    // last send to / delivery from this peer (for eviction)
     rt_seq_seen_t seen[RT_SEQ_MEMORY]; // seqs delivered from this peer recently
 } rt_peer_t;
 

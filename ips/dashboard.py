@@ -33,6 +33,7 @@ ATTACKS = {
     "replay":  ("Replay",        "re-sending old captured packets"),
     "spoof":   ("Spoofing",      "pretending to be another node"),
     "manual":  ("Manual block",  "blocked by the operator from the dashboard"),
+    "keys_missing": ("Missing key updates", "its encryption key updates stopped arriving: possible jamming"),
 }
 CLASS_COLORS = {"normal": BLUE, "flood": RED, "routing": AMBER, "replay": TEAL, "spoof": "#868CFF"}
 
@@ -639,7 +640,10 @@ def live_view():
                                   f"{when} · no BLOCK sent; the IPS won't ask again until this attack stops"))
                 else:
                     title, why = ATTACKS.get(e["attack"], (e["attack"], ""))
-                    items.append(("⚠️", "rgba(255,181,71,.15)", f"Alert: {name(e['node'])}, {title}",
+                    # For a spoof the named node is the VICTIM, not the attacker
+                    headline = (f"Alert: someone is pretending to be {name(e['node'])}" if e["attack"] == "spoof"
+                                else f"Alert: {name(e['node'])}, {title}")
+                    items.append(("⚠️", "rgba(255,181,71,.15)", headline,
                                   f"{when} · {e['note']}" + why_html(e)))
             st.markdown("".join(
                 f'<div class="ev"><div class="ev-dot" style="background:{bg}">{icon}</div>'

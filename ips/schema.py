@@ -26,11 +26,13 @@ FIELD_TYPES = {
     "ttl": int, "hop": int, "rssi": int, "len": int, "link_ok": bool,
 }
 
-# Accept BOTH proposals until the team decides (an unknown type makes parse_line drop the packet):
-#   Rashad's routing code: DATA, ACK, HELLO, BLOCK
-#   Jose's security design: DATA, HELLO, CTRL (signed BLOCK + TIME beacon), KEYS; ACKs are sent as DATA
-# RREQ / RREP were dropped from the protocol on Nov 14.
-PACKET_TYPES = {"DATA", "ACK", "HELLO", "BLOCK", "CTRL", "KEYS"}
+# Cleartext frame types, decided Nov 17 (routing.h RT_FRAME_*, project-breakdown 4.1 / 4.7 #8d).
+# An unknown type makes parse_line drop the packet.
+#   DATA   messages AND their ACKs (the real DATA/ACK type is hidden inside the encryption)
+#   HELLO  one-hop "I'm here" beacon
+#   CTRL   signed by the watchtower: TIME beacons and BLOCKs (BLOCK is no longer its own type)
+#   KEYS   each node's next-epoch key, flooded ~every 10 s
+PACKET_TYPES = {"DATA", "HELLO", "CTRL", "KEYS"}
 
 # Optional fields: kept when present, never required (older logs and the sim may not have them).
 # node: the REAL node behind the transmitter, worked out by the watchtower from its pseudonym
