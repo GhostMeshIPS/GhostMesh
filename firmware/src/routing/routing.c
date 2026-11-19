@@ -88,6 +88,11 @@ void rt_init(rt_node_t *n, const rt_config_t *cfg, const rt_platform_t *p, void 
 
 void rt_on_receive(rt_node_t *n, const rt_frame_t *f, const uint8_t src_mac[6], int8_t rssi)
 {
+    // sync state when the frame ARRIVED. a TIME beacon can sync the node partway through this
+    // function, but its epoch / pseudonym / MAC only switch on the firmware's next tick, so a frame
+    // that arrived before sync must never be relayed (it would go out under the old identity)
+    bool was_synced = n->p->is_synced(n->ctx);
+
     // (LT) checks the link_tag first so outsiders get dropped before anything else
     if(!n->p->link_tag_ok(n->ctx, f)){
         n->p->log(n->ctx, RT_LOG_BAD_LINK_TAG, f);
@@ -100,8 +105,11 @@ void rt_on_receive(rt_node_t *n, const rt_frame_t *f, const uint8_t src_mac[6], 
         return;
     }
 
-    // only the previous, current, or next epoch is accepted (§9.2)
-    if(!epoch_ok(n, f)){
+    // only the previous, current, or next epoch is accepted (§9.2).
+    // exception: an unsynced node has no real epoch yet (it's 0), so it has to let a TIME beacon
+    // through or it could never sync. the signature + "newer than last" checks in ctrl_verify still apply
+    bool first_beacon = !was_synced && f->ver_type == RT_FRAME_CTRL && f->ciphertext[0] == RT_CTRL_TIME;
+    if(!first_beacon && !epoch_ok(n, f)){
         n->p->log(n->ctx, RT_LOG_BAD_EPOCH, f);
         return;
     }
@@ -173,7 +181,7 @@ void rt_on_receive(rt_node_t *n, const rt_frame_t *f, const uint8_t src_mac[6], 
     if(f->ttl == 0){                                                           // (TTL) check for ttl == 0
         n->p->log(n->ctx, RT_LOG_TTL_EXPIRED, f);
     }
-    else if(!n->p->is_synced(n->ctx)){                                         // no relaying before the first clock sync (§9.2)
+    else if(!was_synced){                                                      // no relaying anything that arrived before sync (§9.2)
         n->p->log(n->ctx, RT_LOG_NOT_SYNCED, f);
     }
     else{

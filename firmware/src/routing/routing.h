@@ -44,6 +44,9 @@ typedef struct {
 // cleartext ver_type: what relays and sniffers see (§9.4). ACKs go out as DATA. Values TBD with Jose.
 enum { RT_FRAME_DATA = 1, RT_FRAME_HELLO = 2, RT_FRAME_CTRL = 3, RT_FRAME_KEYS = 4 };
 
+// CTRL subtype = first byte of the CTRL region (ciphertext[0]). must match GM_CTRL_TIME in gm_crypto.h
+#define RT_CTRL_TIME 1
+
 // inner type: the real type, only visible after decrypting. gm_crypto uses these, so keep the names.
 enum { RT_TYPE_DATA = 1, RT_TYPE_ACK = 2 };
 

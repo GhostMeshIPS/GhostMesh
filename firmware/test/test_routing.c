@@ -152,7 +152,13 @@ static bool cb_decrypt(void *ctx, const rt_frame_t *f, rt_inner_t *out)
 
 static bool cb_blocked(void *ctx, const rt_frame_t *f, const uint8_t mac[6]) { (void)ctx; (void)f; return block_on && memcmp(mac, blocked_mac, 6) == 0; }
 static void cb_keys(void *ctx, const rt_frame_t *f) { (void)f; ((tnode_t *)ctx)->keys_seen++; }
-static bool cb_ctrl(void *ctx, const rt_frame_t *f) { (void)ctx; return f->ciphertext[0] == 0x01; }  // 0x01 = "signature ok"
+// 0x01 = "signature ok". like gm_node, a verified TIME beacon (subtype RT_CTRL_TIME = 1) syncs the node
+static bool cb_ctrl(void *ctx, const rt_frame_t *f)
+{
+    if (f->ciphertext[0] != 0x01) return false;
+    ((tnode_t *)ctx)->synced = true;
+    return true;
+}
 
 static void cb_pseudo(void *ctx, uint8_t out[4]) { out[0] = 0xA0; out[1] = (uint8_t)((tnode_t *)ctx)->id; out[2] = (uint8_t)epoch_now; out[3] = 0; }
 static uint16_t cb_epoch(void *ctx) { (void)ctx; return epoch_now; }
@@ -490,6 +496,43 @@ static void test_ctrl_keys_hello(void)
     CHECK(nodes[1].log[RT_LOG_RELAY_SCHEDULED] == 2, "hello: not relayed");
 }
 
+static void test_unsynced_time_beacon(void)
+{
+    // the Nov 17 bug: an unsynced node's epoch is 0, so its first TIME beacon was dropped as bad_epoch
+    world(2, NULL);
+    nodes[1].synced = false;
+    rt_frame_t beacon = make_frame(0, RT_FRAME_CTRL, 40, 3, (uint16_t)(epoch_now + 500));
+    beacon.ciphertext[0] = RT_CTRL_TIME; cb_link_tag(NULL, &beacon, beacon.link_tag);
+    inject(1, &beacon, 0);
+    CHECK(nodes[1].log[RT_LOG_BAD_EPOCH] == 0,  "unsynced: TIME beacon not dropped as bad_epoch");
+    CHECK(nodes[1].synced,                      "unsynced: beacon verified, node now synced");
+    run(1000);
+    CHECK(nodes[1].tx == 0,                     "unsynced: syncing beacon is not relayed (old identity)");
+    CHECK(nodes[1].log[RT_LOG_NOT_SYNCED] == 1, "unsynced: NOT_SYNCED logged for that relay");
+
+    // only TIME is exempt: a BLOCK (subtype 2) outside the window is still dropped while unsynced
+    world(2, NULL);
+    nodes[1].synced = false;
+    rt_frame_t block = make_frame(0, RT_FRAME_CTRL, 41, 3, (uint16_t)(epoch_now + 500));
+    block.ciphertext[0] = 2; cb_link_tag(NULL, &block, block.link_tag);
+    inject(1, &block, 0);
+    CHECK(nodes[1].log[RT_LOG_BAD_EPOCH] == 1,  "unsynced: non-TIME CTRL still epoch-checked");
+
+    // and only while unsynced: a synced node drops a TIME beacon outside the window
+    nodes[1].synced = true;
+    rt_frame_t late = make_frame(0, RT_FRAME_CTRL, 42, 3, (uint16_t)(epoch_now + 500));
+    late.ciphertext[0] = RT_CTRL_TIME; cb_link_tag(NULL, &late, late.link_tag);
+    inject(1, &late, 0);
+    CHECK(nodes[1].log[RT_LOG_BAD_EPOCH] == 2,  "synced: TIME beacon outside the window dropped");
+
+    // the next beacon, arriving after sync and inside the window, is relayed normally
+    rt_frame_t next = make_frame(0, RT_FRAME_CTRL, 43, 3, epoch_now);
+    next.ciphertext[0] = RT_CTRL_TIME; cb_link_tag(NULL, &next, next.link_tag);
+    inject(1, &next, 0);
+    run(1000);
+    CHECK(nodes[1].tx == 1,                     "synced: next beacon relayed");
+}
+
 static void test_long_cache(void)
 {
     world(2, NULL);
@@ -540,6 +583,7 @@ int main(int argc, char **argv)
     RUN(test_rate_limit,       "One transmitter limited to 3 new msg_ids/s (lowered for the test).");
     RUN(test_blocked,          "Frames from a blocked MAC are dropped and never relayed.");
     RUN(test_ctrl_keys_hello,  "CTRL relayed only if verified; KEYS handed over and flooded; HELLO ignored.");
+    RUN(test_unsynced_time_beacon, "Unsynced node takes its first TIME beacon (epoch 0 bug), doesn't relay it.");
     RUN(test_long_cache,       "A replay 90 s later (past the 60 s cache) is still caught.");
     RUN(test_hop_padding,      "Originators pad hop_count by 0-2 and keep hop_count + ttl constant.");
 
