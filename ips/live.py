@@ -26,7 +26,7 @@ import pandas as pd
 from detect import FEATURES, IF_PATH, RF_PATH, iforest_detect, rule_detect, train_rf
 from explain import EVIDENCE, explain
 from features import WINDOW, PacketTracker, build_features
-from ingest import open_serial, replay, read_file, serial_stream
+from ingest import read_file, replay, watchtower_stream
 from retention import WINDOWS_MAX_AGE_S, prune_jsonl
 from schema import NODE_IDS, WATCHTOWER, encode_cmd, make_block_cmd, make_unblock_cmd
 
@@ -45,8 +45,8 @@ ALERT_ONLY = {"spoof"}                           # blocking a spoofed ID would c
 RSSI_JUMP_DB = 6.0        # boards sit still, so honest RSSI stays within a few dB (synthetic noise: 2 dB)
 RSSI_HISTORY_MIN = 10     # need at least this many normal windows before trusting a node's baseline
 
-# Missing KEYS (Jose's decision 10e / open issue O18). Each node floods its next-epoch key ~every
-# 10 s (~6 a minute). A node that is clearly alive but whose KEYS stop arriving may be the target
+# Missing KEYS (Jose's decision 10e / open issue O18). Each node floods its next-epoch key ~4 times
+# a minute (real boards; the plan said ~6). A node that is clearly alive but whose KEYS stop arriving may be the target
 # of a jammer that reacts to frame type. A BLOCK can't stop a jammer, so this is an ALERT only.
 # A simple rule, not ML: there's no attacker transmitting anything to learn from.
 KEYS_WINDOW_S = 60        # look back this far
@@ -85,6 +85,7 @@ class LiveIPS:
         self.last_attack_w = {}               # node -> last window it was flagged in
         self.blocks = {}                      # node -> time the block expires
         self.block_target = {}                # node -> (pseudo, mac, pair_only) the block was sent for
+        self.block_reason = {}                # node -> attack name, to re-send the same BLOCK after a W reset
         self.pending = {}                     # node -> (attack, evidence, pair_only) waiting for the operator
         self.dismissed = set()                # nodes whose current attack the operator chose to ignore
         self.cmd_offset = 0                   # how far into COMMANDS_LOG we've read
@@ -105,17 +106,19 @@ class LiveIPS:
         # Stamp msg_id history first (relay vs. started it, how old, repeated?), even for the
         # watchtower's own frames: otherwise the first node relaying a beacon would look like its author.
         self.tracker.annotate(pkt)
-        if pkt.get("node") == WATCHTOWER:
-            return                            # the watchtower's own frames (CTRL: BLOCKs, time beacons) aren't judged
         # t = the packet's own timeline (used for all the maths);
         # offset turns it into real clock time for display ("wall" in the logs)
         self.offset = pkt.get("rx_t", pkt["t"]) - pkt["t"]
         w = int(pkt["t"] // WINDOW)
         if self.current_window is None:
             self.current_window = w
+        # Any frame, W's included, proves time has moved on, so the previous second can be judged.
+        # (Before: only mesh frames did, so an attack's last second could wait until the mesh spoke again.)
         if w > self.current_window:           # the previous window is complete
             self.close_window(self.current_window, now=pkt["t"])
             self.current_window = w
+        if pkt.get("node") == WATCHTOWER:
+            return                            # the watchtower's own frames (CTRL: BLOCKs, time beacons) aren't judged
         self.note_activity(pkt)
         self.buffer.append(pkt)
         # forget packets older than BUFFER_SECONDS
@@ -279,6 +282,7 @@ class LiveIPS:
         until = now + BLOCK_SECONDS
         self.blocks[node] = until
         self.block_target[node] = (pseudo, mac, pair_only)
+        self.block_reason[node] = attack
         self.pending.pop(node, None)
         self.send_cmd(make_block_cmd(node, attack, until, pseudo=pseudo, mac=mac, pair_only=pair_only))
         if pair_only:
@@ -288,17 +292,37 @@ class LiveIPS:
     def unblock(self, node):
         """Forget a block; returns the (pseudo, mac, pair_only) target it was sent for."""
         del self.blocks[node]
+        self.block_reason.pop(node, None)
         return self.block_target.pop(node, ("", "", False))
+
+    def resend_blocks(self):
+        """Send every active BLOCK again. Used when W comes back after a reset or a USB reconnect:
+        W keeps its block list in RAM, so a reset forgets them while we still think they're on.
+        Safe to repeat: W updates a block with the same target instead of adding a second one."""
+        for node, until in self.blocks.items():
+            pseudo, mac, pair_only = self.block_target.get(node, ("", "", False))
+            self.send_cmd(make_block_cmd(node, self.block_reason.get(node, "manual"), until,
+                                         pseudo=pseudo, mac=mac, pair_only=pair_only))
+        if self.blocks:
+            print(f"  [watchtower] re-sent {len(self.blocks)} active block(s): {', '.join(self.blocks)}")
+
+    def flush(self):
+        """End of the stream (replay finished, or Ctrl+C): judge the last second too."""
+        if self.current_window is not None and self.buffer:
+            self.close_window(self.current_window, now=(self.current_window + 1) * WINDOW)
 
     def process_commands(self, now):
         """Apply new operator clicks (written by the dashboard) since we last looked."""
         if not os.path.exists(COMMANDS_LOG):
             return
-        with open(COMMANDS_LOG) as f:
+        with open(COMMANDS_LOG, "rb") as f:
             f.seek(self.cmd_offset)
-            lines = f.readlines()
-            self.cmd_offset = f.tell()
-        for line in lines:
+            data = f.read()
+        # Only take COMPLETE lines. If the dashboard is halfway through writing a click, leave that
+        # half-line for next time (before: it was skipped and the click was lost).
+        complete = data.rfind(b"\n") + 1
+        self.cmd_offset += complete
+        for line in data[:complete].decode("utf-8", "replace").splitlines():
             try:
                 cmd = json.loads(line)
             except json.JSONDecodeError:
@@ -405,10 +429,28 @@ def main():
         json.dump({"mode": "watchtower" if args.port else "replay", "speed": args.speed,
                    "source": args.port or args.file or "test_session.jsonl", "started": time.time()}, f)
 
+    ips = None                               # created below; the callbacks only run once packets flow
     if args.port:
-        ser = open_serial(args.port)
-        source = serial_stream(ser, on_event=watchtower_event)
-        send_cmd = lambda cmd: ser.write(encode_cmd(cmd))        # real BLOCK to the watchtower
+        conn = {"ser": None}                 # the CURRENT port: replaced after every reconnect
+
+        def send_cmd(cmd):                   # real BLOCK to the watchtower
+            try:
+                conn["ser"].write(encode_cmd(cmd))
+            except (OSError, AttributeError) as err:
+                # cable out: don't crash. The block stays in ips.blocks and is re-sent on reconnect.
+                print(f"  [watchtower] couldn't send {cmd['cmd']} ({err}); will re-send after reconnecting")
+
+        def on_connect(ser, first):
+            conn["ser"] = ser
+            if not first and ips:
+                ips.resend_blocks()          # in case W kept running and only the cable moved
+
+        def on_event(ev):
+            watchtower_event(ev)
+            if ev.get("ev") == "clock_set" and ips:
+                ips.resend_blocks()          # W was reset (its blocks are gone) and now accepts BLOCKs again
+
+        source = watchtower_stream(args.port, on_event=on_event, on_connect=on_connect)
     else:
         source = replay(args.file or "test_session.jsonl", speed=args.speed)
         send_cmd = lambda cmd: print("  -> would send:", json.dumps(cmd))   # no hardware yet
@@ -420,6 +462,7 @@ def main():
             ips.feed(pkt)
     except KeyboardInterrupt:
         print("\nstopped")
+    ips.flush()                              # judge the final second too
     ips.explainer.shutdown(wait=True)        # let any explanation still being written finish
 
 

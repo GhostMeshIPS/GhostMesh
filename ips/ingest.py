@@ -115,6 +115,39 @@ def serial_stream(ser, on_event=None):
             yield pkt
 
 
+def watchtower_stream(port, on_event=None, on_connect=None, retry_s=2.0):
+    """serial_stream that survives the USB cable being wiggled or unplugged.
+
+    If the port disappears, we close it, wait, and reopen it (forever), instead of crashing
+    mid-demo. on_connect(ser, first) runs after every (re)connect, so the caller can swap in
+    the new port and re-send anything W may have forgotten. Reopening the port can reset W
+    (PROTOCOL.md 10.1 D2); serial_stream then re-sends the clock as usual.
+    pyserial's errors are a kind of OSError, so OSError catches all of them.
+    """
+    first = True
+    while True:
+        try:
+            ser = open_serial(port)
+        except OSError as err:
+            print(f"  [watchtower] can't open {port} ({err}); retrying in {retry_s:.0f} s")
+            time.sleep(retry_s)
+            continue
+        if not first:
+            print(f"  [watchtower] reconnected to {port}")
+        if on_connect:
+            on_connect(ser, first)
+        first = False
+        try:
+            yield from serial_stream(ser, on_event)
+        except OSError as err:
+            print(f"  [watchtower] connection lost ({err}); reconnecting...")
+            try:
+                ser.close()
+            except OSError:
+                pass
+            time.sleep(retry_s)
+
+
 if __name__ == "__main__":
     # Quick check: replay the first 10 packets of the test session as fast as possible
     for i, pkt in enumerate(replay("test_session.jsonl", speed=0)):
