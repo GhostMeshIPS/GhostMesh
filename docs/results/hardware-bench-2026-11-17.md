@@ -72,10 +72,9 @@ Of the 4 `id_ok: false` frames:
   queued just before the MAC change went out just after it. A harmless race, but the IPS should not
   treat a lone mismatch right at a boundary as spoofing.
 - **2 from C mid-epoch with MAC `3c:0f:02:e3:ba:d8`**: no locally-administered bit, so it's C's
-  **factory MAC**. That defeats MAC rotation for that period. Most likely C still runs firmware from
-  before the "sync after reboot" fix (a board rebooting with saved state kept its factory MAC until the
-  next minute), or a MAC change failed. **Next step (Yunus):** reflash C, check its serial for
-  `set_mac_failed`, re-run and confirm no locally-unadministered MACs appear in the log.
+  **factory MAC**. That defeats MAC rotation for that period.
+  **Update Nov 18: root cause found** (it was not stale firmware on C): frames relayed in the ~100 ms after a
+  node takes its first beacon go out before its MAC switches. See `hardware-smoke-2026-11-18.md` §3.1.
 
 ---
 
@@ -117,7 +116,8 @@ C 6.4 DATA + 5.1 KEYS, W 6.1 CTRL (TIME beacons). ~127 frames/min total at W, in
 
 - **Opening the serial port reset the board.** The default pyserial open toggles DTR/RTS, which
   reboots an S3 on native USB. This wiped W's clock every time the client was restarted. Fixed in
-  `tools/chat_client.py` (opens with DTR/RTS low); needs a confirm on the next run. **Hannan:**
+  `tools/chat_client.py` (opens with DTR/RTS low). **Update Nov 18: this does not stop the reset on
+  Windows**, see `hardware-smoke-2026-11-18.md` §3.2. **Hannan:**
   `ips/ingest.py` line 69 opens with `serial.Serial(port, BAUD, timeout=1)`, which will do the same
   to W and wipe its clock. Open it the way the chat client now does:
   `s = serial.Serial(); s.port = port; s.baudrate = BAUD; s.timeout = 1; s.dtr = False; s.rts = False; s.open()`.

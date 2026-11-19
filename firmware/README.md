@@ -79,8 +79,8 @@ python tools/chat_client.py --port COM13 --sync --log ips/data/raw/run1.jsonl
   timestamped ground-truth note. `ips/data/` is gitignored: share the files directly.
 - `/status` shows frames, beacons, unknown transmitters, and per-node frame counts + RSSI.
 - `/verbose` streams the frames W hears. `/block C` / `/unblock C` block a node for 2 min.
-- W keeps its clock as long as it stays powered. Opening the port no longer resets the board (the
-  client opens it with DTR/RTS low); other tools must do the same (see Known issues).
+- W keeps its clock as long as it stays powered, but on Windows reopening the port resets it: keep
+  one session open, or type `/time` after reopening (see Known issues).
 
 ### Nodes on power banks
 
@@ -158,9 +158,11 @@ Measurements: `docs/results/hardware-bench-2026-11-17.md`.
 - **First-beacon bug (routing):** `rt_on_receive` checks the epoch window before CTRL, so an unsynced
   node drops TIME beacons. `gm_node_rx` works around it, but the first beacon isn't relayed, so sync
   spreads one hop per 10 s. Fix belongs in `routing.c`.
-- **C sent with its factory MAC** in 2 frames on Nov 17 (MAC rotation leak). Suspected stale firmware on
-  C; reflash and recheck.
-- **Opening a serial port can reset the board.** pyserial's default open toggles DTR/RTS, which reboots an
-  S3 on native USB and wipes W's clock. `tools/chat_client.py` is fixed; `ips/ingest.py` isn't yet.
+- **Factory-MAC leak at first sync:** frames relayed in the ~100 ms after a node takes its first beacon go
+  out under its real hardware MAC and an old pseudonym (`docs/results/hardware-smoke-2026-11-18.md` §3.1).
+  Fix planned: switch epoch + MAC before returning to routing.
+- **Opening a serial port resets the board on Windows**, which wipes W's clock, even when opened with
+  DTR/RTS low. Until the fix (the client re-sends `set_time` when W reports `clock_not_set`), keep **one** W
+  session open, or type `/time` after reopening. `ips/ingest.py` has the same problem.
 - Board D isn't working (to debug).
 - Frames that W hears before its clock is set carry local time and `node: "?"`. Drop `t < 1e9` from logs.
