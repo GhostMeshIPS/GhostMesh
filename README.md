@@ -64,7 +64,7 @@ ghostmesh/
 ├── PROTOCOL.md
 ├── firmware/            # Node firmware: radio, frame codec, routing, crypto, roles
 │   ├── src/
-│   └── config/          # Per-board role, keys, neighbor allowlist
+│   └── config/          # Per-board role and keys
 ├── sim/                 # Network simulator, experiments, plots
 ├── security/            # Keygen, pcap converter, Wireshark dissector, attacks, threat model
 ├── ips/                 # Ingest, features, models, dashboard, datasets
@@ -125,8 +125,8 @@ python tools/chat_client.py --port /dev/ttyUSB0   # TBD
 
 ## Known limitations
 
-- **Range is tabletop-scale.** ESP-NOW is short range; multi-hop in one room is forced with low TX power and an RSSI gate. A fixed neighbor allowlist exists as a fallback for demo reliability, and it only works in segments that don't use MAC rotation.
-- **Route learning leaks some metadata.** The `next_hop` field reveals neighbor relationships. Pure flooding hides more but costs more transmissions; we measure that tradeoff.
+- **Range is tabletop-scale.** ESP-NOW reaches many meters, so on one table every board hears every other one, even at minimum TX power. For the demo, multi-hop is forced physically: metal / aluminum shielding between the boards makes sure A and C really can't hear each other, and MAC rotation stays on the whole time. We decided against a MAC allowlist since it would be a security risk.
+- **Route learning isn't deployed.** The mesh uses managed flooding. We built a route-learning mode that limits each flood to how far away the recipient is, but any scoped TTL tells a sniffer roughly how far the recipient is, so we kept it off and only use it in the sim to measure what it would save (see [PROTOCOL.md §6](PROTOCOL.md)).
 - **MAC-rotating attackers** can try to dodge a block. Per-neighbor rate limits and the link-tag requirement limit this to insiders.
 - Keys are pre-provisioned for the demo; there's no in-field key exchange yet.
 - Text only, no formal security proofs.
