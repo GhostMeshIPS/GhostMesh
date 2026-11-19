@@ -578,7 +578,7 @@ _Owner: Rashad_
 
 **Transmissions per delivered message:** total transmissions in the run (including those spent on messages that failed) ÷ number of messages delivered.
 
-**Reroute time:** _TBD (needed for the unplug-B test)._
+**Reroute time:** While A sends C one message per second, the time from the moment B is unplugged to the moment C's laptop shows the first message that A sent **after** the unplug. It's measured over at least 10 trials and reported as the median and the maximum. Any message that never arrives during the trial is reported separately as lost. 
 
 ## 14. Open questions
 
