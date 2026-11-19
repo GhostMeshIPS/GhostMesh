@@ -25,20 +25,21 @@ GLOSSARY = """\
 - Mesh network: radios (nodes A, B, C, D) that pass messages along for each other, no internet needed.
 - Watchtower: a listening radio wired to this laptop. It hears every packet and sends BLOCK commands.
 - Packet: one radio message. The IPS only reads its metadata (who sent it, when, how strong), never its content.
-- HELLO: a "I'm here" beacon each node sends about every 2 seconds so neighbours know it exists.
-- TTL (time to live): how many more hops a message may travel. Honest HELLOs use 1.
-- Hop count: how many relays a message has already passed through.
+- TTL (time to live): how many more hops a message may travel.
+- Hop count: how many relays a message has already passed through. On our mesh TTL + hop count always adds up to 5, so a message where they don't add up has been tampered with.
+- HELLO: an optional "I'm here" beacon. It is turned off on our boards, so normal traffic has none.
 - RSSI / signal: how strong a radio sounds at the watchtower, in dBm. The values are negative: -45 dBm is a STRONG signal (radio is close), -75 dBm is a WEAK signal (radio is far). Closer to zero = stronger.
 - Window: the IPS judges each radio once per 1-second slice of time.
 - Random Forest: the AI model that decides normal / flooding / routing abuse / replay / spoofing.
 - Confidence: the share of the Random Forest's 100 decision trees that agreed.
-- Rule baseline: a simple "more than 15 packets per second, or more than 1 HELLO per second = attack" check, shown for comparison.
+- Rule baseline: a simple "more than 15 packets per second (or more than 1 HELLO per second) = attack" check, shown for comparison.
 - Relay: a node passing someone else's message along. Relays get busy when someone floods, so the IPS looks at who STARTED the messages, not just who transmitted them.
 - Isolation Forest: a second AI model that flags anything unusual without knowing attack types.
 - BLOCK: a signed command telling every node to ignore a radio for 60 seconds. Blocks expire on purpose.
 - MAC rotation: radios change their hardware address every 60 seconds for privacy. The watchtower can still tell which real node (A, B, C, D or X) sent each packet, so the IPS follows a node across rotations.
 - Flooding: a radio sending packets far faster than normal to drown out the mesh.
-- Routing abuse: a radio advertising fake routes (fake TTL, extra HELLOs) so messages flow through it.
+- Routing abuse: a radio lying about how many hops the messages it relays have travelled (claiming fewer), so it looks like a shortcut and messages flow through it.
+- Outsider: a radio without our network key. Its packets fail the link check, so nodes drop them, but the IPS still sees and blocks it.
 - Replay: a radio re-sending old captured packets.
 - Spoofing: a radio pretending to be another node. Only an alert, because blocking that identity would also cut off the real node."""
 

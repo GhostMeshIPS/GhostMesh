@@ -12,7 +12,8 @@ What it models (numbers from PROTOCOL.md and Jose's security/notes-for-hannan.md
   * KEYS frames from every node about every 10 s; a signed CTRL time beacon from W every 10 s.
   * Every node swaps MAC + pseudonym on each Unix minute, with a short outage (~0.3 s).
   * Relays accept at most ~20 new msg_ids per second from one transmitter (flood hardening).
-Attacks: flood (any rate), routing abuse (HELLOs with a fake TTL; the boards send none), replay (X re-sends frames
+Attacks: flood (any rate, from X or from an outsider without the network key), routing abuse (X relays
+with a forged low hop count, Jose's notes section 3), replay (X re-sends frames
 it overheard 2+ minutes earlier). Harmless event that must NOT be flagged: node B unplugged.
 
 Relayed copies of an attacker's frames are labelled "normal": the relay isn't attacking, and
@@ -31,7 +32,7 @@ ROTATION_GAP = 0.3       # seconds of silence after each boundary (changing MAC 
 
 DEFAULT_TTL = 5          # hardware value (Yunus, Nov 19): 3 real hops + 2 for hop padding
 HELLO_ENABLED = False    # honest HELLOs are OFF on the real boards (hello_interval_ms = 0, Yunus, Nov 19),
-                         # so normal traffic has none and ANY HELLO is suspicious (see routing_attack)
+                         # so normal traffic has none (a HELLO on the real mesh would itself be odd)
 HELLO_PERIOD = 2.0       # if turned on: HELLO beacons ~every 2 s (0.5 Hz), never relayed
 JITTER = 0.2             # +/- wobble on each HELLO interval
 KEYS_PERIOD = 10.0       # each node floods its next-epoch key ~6 times a minute
@@ -59,8 +60,7 @@ CONVERSATIONS = [("A", "C"), ("B", "D")]     # who chats with whom (A-C must go 
 ATTACKER = "X"           # the attacker board: a keyed insider that behaves normally between attacks
 FLOOD_RATE = 30          # packets per second (a normal node originates well under 1/s)
 SLOW_FLOOD_RATE = 8      # under the rule's threshold of 15
-ROUTING_RATE = 5         # fake HELLOs per second (normal: none, HELLOs are off on the boards)
-ROUTING_FAKE_TTL = 10    # honest HELLOs use TTL 1
+OUTSIDER_RATE = 10       # outsider flood: frames per second from a radio without the network key
 REPLAY_RATE = 2          # replayed frames per second
 REPLAY_AGE = (120, 170)  # replayed frames were captured this many seconds earlier
 SPOOF_RATE = 2           # messages per second X sends while pretending to be a victim
@@ -122,10 +122,14 @@ class Mesh:
         self.packets = []
         self.down = []                        # (node, start, end): unplugged during that time
         self.jam_keys = []                    # (node, start, end): its KEYS frames are jammed
+        self.forging = []                     # (start, end): X forges the hop count on everything it relays
         self.accepted = defaultdict(int)      # (relay, transmitter, second) -> new msg_ids accepted
 
     def is_down(self, node, t):
         return any(n == node and s <= t - START_T < e for n, s, e in self.down)
+
+    def forging_hops(self, t):
+        return any(s <= t - START_T < e for s, e in self.forging)
 
     def keys_jammed(self, node, t):
         """A jammer that reacts to frame type wipes out this node's KEYS frames (O18), nothing else."""
@@ -153,8 +157,16 @@ class Mesh:
             if tx == origin and as_node:
                 fake_pseudo, fake_mac = identity(as_node, t)
                 disguise = dict(pseudo=fake_pseudo, node_tag=as_node, mac=fake_mac if copy_mac else None)
-            self.packets.append(make_packet(t, tx, ptype, ttl, hop, msg_id,
-                                            label if tx == origin else "normal", **disguise))
+            lab = label if tx == origin else "normal"
+            if tx == ATTACKER and tx != origin and hop > 0 and self.forging_hops(t):
+                # Routing abuse: X relays claiming hop 0, i.e. "I'm right next to the sender, route
+                # through me". Half the time it leaves TTL alone (ttl + hop no longer adds up), half
+                # the time it also fixes TTL to hide that (only the hop going DOWN gives it away).
+                hop = 0
+                if random.random() < 0.5:
+                    ttl = DEFAULT_TTL
+                lab = "routing"
+            self.packets.append(make_packet(t, tx, ptype, ttl, hop, msg_id, lab, **disguise))
             if ttl == 0:
                 continue                      # out of hops: nobody relays it further
             for nb in sorted(TOPOLOGY[tx]):   # sorted: same order every run (sets aren't ordered)
@@ -212,13 +224,17 @@ class Mesh:
             self.flood(t, ATTACKER, "DATA", label="flood")
             t += 1 / rate
 
-    def routing_attack(self, start, end, rate=ROUTING_RATE):
-        """X beacons HELLOs far too often with a fake TTL, to look like a great neighbour.
-        (Placeholder until Jose's task 11 defines the real forgery: lying about hop counts.)"""
+    def outsider_flood(self, start, end, rate=OUTSIDER_RATE):
+        """A radio WITHOUT the network key spams frames. It can't compute a valid link_tag or a real
+        pseudonym, so W sees link_ok = false from an unknown radio ("?"), and the first relay drops
+        them (never relayed). Jose's notes section 3: "outsider: link_ok=false burst"."""
+        mac, pseudo = "0e:5a:17:c3:9b:42", f"{random.getrandbits(32):08x}"
         t = START_T + start
         while t < START_T + end:
-            self.packets.append(make_packet(t, ATTACKER, "HELLO", ROUTING_FAKE_TTL, 0,
-                                            new_msg_id(), label="routing"))
+            pkt = make_packet(t, ATTACKER, "DATA", DEFAULT_TTL, 0, new_msg_id(), label="flood",
+                              pseudo=pseudo, mac=mac, node_tag="?")
+            pkt["link_ok"] = False
+            self.packets.append(pkt)
             t += 1 / rate
 
     def spoof_attack(self, victim, start, end, copy_mac=False, rate=SPOOF_RATE):
@@ -254,9 +270,10 @@ class Mesh:
 
 
 def make_session(seed, duration, floods=(), routing=(), replays=(), unplug_b=None, x_off=False, spoofs=(),
-                 jam_keys=()):
+                 jam_keys=(), outsider=()):
     """One labelled session. Times are seconds into the session.
     floods = [(rate, start, end), ...]; routing / replays = [(start, end), ...];
+    outsider = [(rate, start, end), ...]: flood from a radio without the network key;
     spoofs = [(victim, start, end, copy_mac), ...];
     jam_keys = [(node, start, end), ...]: that node's KEYS frames never get through (labels stay
     "normal": the node itself isn't misbehaving; live.py's missing-KEYS check alerts on it);
@@ -267,13 +284,14 @@ def make_session(seed, duration, floods=(), routing=(), replays=(), unplug_b=Non
     if x_off:
         mesh.down.append((ATTACKER, 0, duration))
     mesh.jam_keys.extend(jam_keys)
+    mesh.forging.extend(routing)              # before normal traffic: X forges hops on what it relays
     if unplug_b:
         mesh.down.append(("B", *unplug_b))
     mesh.normal_traffic()
     for rate, start, end in floods:
         mesh.flood_attack(rate, start, end)
-    for start, end in routing:
-        mesh.routing_attack(start, end)
+    for rate, start, end in outsider:
+        mesh.outsider_flood(start, end, rate)
     for victim, start, end, copy_mac in spoofs:
         mesh.spoof_attack(victim, start, end, copy_mac)
     for start, end in replays:                # after normal traffic: it replays what it overheard
@@ -301,6 +319,7 @@ if __name__ == "__main__":
         "train_session.jsonl":      dict(seed=42, duration=600,
                                          floods=[(30, 40, 60), (20, 100, 120), (10, 160, 180), (5, 220, 240)],
                                          routing=[(300, 330)], replays=[(420, 450)], unplug_b=(480, 520),
+                                         outsider=[(25, 255, 285), (6, 455, 475)],   # loud + slow, no key
                                          # spoof A (own MAC, 7 dB louder) and C (copied MAC, 12 dB louder)
                                          spoofs=[("A", 360, 390, False), ("C", 540, 570, True)]),
         # Unseen test: different seed and timings, a flood rate (8/s) not in training, and a spoof of
@@ -309,7 +328,8 @@ if __name__ == "__main__":
                                          routing=[(60, 90)], unplug_b=(100, 140),
                                          floods=[(SLOW_FLOOD_RATE, 150, 180)], replays=[(230, 260)],
                                          spoofs=[("B", 265, 295, False)],
-                                         jam_keys=[("C", 170, 260)]),       # C's KEYS jammed for 90 s
+                                         jam_keys=[("C", 170, 260)],        # C's KEYS jammed for 90 s
+                                         outsider=[(10, 195, 220)]),        # keyless radio, rate not in training
     }
     for path, kw in sessions.items():
         packets = make_session(**kw)

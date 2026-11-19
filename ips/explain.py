@@ -25,8 +25,8 @@ NODE_NAMES = {"A": "Node A", "B": "Node B", "C": "Node C", "D": "Node D", "X": "
 # Our own fixed wording for each attack (never taken from packets)
 ATTACK_TEXT = {
     "flood":   "flooding: sending packets far faster than a normal node, to drown out the mesh",
-    "routing": ("routing abuse: advertising fake route information (a fake TTL and extra HELLO beacons) "
-                "so it looks like the best path and other nodes send their messages through it"),
+    "routing": ("routing abuse: lying about how many hops the messages it passes on have travelled, "
+                "so it looks like a shortcut and other nodes send their messages through it"),
     "replay":  "replay: re-sending old captured packets",
     "spoof":   "spoofing: pretending to be another node",
     "keys_missing": ("missing key updates: its encryption key updates stopped arriving while it is "
@@ -50,6 +50,8 @@ EVIDENCE = {
     "rssi_dev_max": ("signal jump from its usual level", "{:.0f} dB", "up"),
     "mac_count":    ("radio addresses using its identity", "{:.0f}", "up"),
     "id_mismatch":  ("packets whose address didn't match their identity", "{:.0f}", "up"),
+    "hop_down_count":    ("relayed messages claiming fewer hops than already seen", "{:.0f}", "up"),
+    "ttl_hop_bad_count": ("messages with an edited hop/TTL header", "{:.0f}", "up"),
 }
 
 

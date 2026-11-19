@@ -1,4 +1,4 @@
-from collections import deque
+from collections import Counter, deque
 from statistics import median
 
 import pandas as pd
@@ -50,14 +50,25 @@ class PacketTracker:
     Signal memory per identity (spoofing: a second radio using someone's identity):
       rssi_dev        dB between this packet's signal and that identity's usual level (median of
                       its last RSSI_HISTORY packets). Boards don't move, so honest values stay small.
+    Hop/TTL memory (routing abuse: a relay forging its hop count to look like a shortcut,
+    Jose's notes-for-hannan.md section 3):
+      hop_down        True if this copy claims FEWER hops than a copy of the same msg_id already
+                      heard. Honest relays only ever add hops (0 of 1,538 frames on the real boards).
+      ttl_hop_bad     True if a DATA/KEYS frame's ttl + hop isn't the network's usual sum. Relays
+                      do ttl-1 / hop+1 and hop padding keeps the sum fixed (5 on the boards, 16 in
+                      Rashad's sim; TTL scoping is off for privacy), so a different sum = edited.
+                      The usual sum is LEARNED (most common so far), not hard-coded. CTRL is left out:
+                      W's own frames use a different TTL (sum 7).
     """
     MEMORY_S = 180      # same as the nodes' long replay cache (Jose, PROTOCOL.md 9.7)
     RSSI_HISTORY = 120  # packets per identity (~40 s of a busy node): long enough that a
                         # spoofer's own packets can't quickly drag the "usual level" towards it
     RSSI_MIN = 10       # need this many packets before judging deviations
+    SUM_MIN = 20        # DATA/KEYS frames needed before trusting the usual ttl + hop
 
     def __init__(self):
-        self.seen = {}          # msg_id -> [first time heard, set of identities that sent it]
+        self.seen = {}          # msg_id -> [first time heard, identities that sent it, lowest hop heard]
+        self.sums = Counter()   # ttl + hop -> how often, for DATA/KEYS (the usual sum = most common)
         self.rssi = {}          # identity -> its recent RSSI values
         self.last_prune = 0.0
 
@@ -68,11 +79,19 @@ class PacketTracker:
         history.append(pkt["rssi"])
         rec = self.seen.get(mid)
         if rec is None:
-            pkt.update(first_copy=True, msg_age=0.0, same_tx_repeat=False)
-            self.seen[mid] = [t, {who}]
+            pkt.update(first_copy=True, msg_age=0.0, same_tx_repeat=False, hop_down=False)
+            self.seen[mid] = [t, {who}, pkt["hop"]]
         else:
-            pkt.update(first_copy=False, msg_age=round(t - rec[0], 3), same_tx_repeat=who in rec[1])
+            pkt.update(first_copy=False, msg_age=round(t - rec[0], 3), same_tx_repeat=who in rec[1],
+                       hop_down=pkt["hop"] < rec[2])
             rec[1].add(who)
+            rec[2] = min(rec[2], pkt["hop"])
+        pkt["ttl_hop_bad"] = False
+        if pkt["type"] in ("DATA", "KEYS") and identity_of(pkt) != WATCHTOWER:
+            total = pkt["ttl"] + pkt["hop"]
+            if sum(self.sums.values()) >= self.SUM_MIN:
+                pkt["ttl_hop_bad"] = total != self.sums.most_common(1)[0][0]
+            self.sums[total] += 1
         if t - self.last_prune > 10:                      # forget msg_ids older than MEMORY_S
             self.seen = {m: r for m, r in self.seen.items() if t - r[0] <= self.MEMORY_S}
             self.last_prune = t
@@ -128,6 +147,8 @@ def build_features(df):
         rssi_dev_max = ("rssi_dev", "max"),                         # biggest jump from its usual signal (dB)
         mac_count = ("mac", "nunique"),                             # MACs using this identity this second
         id_mismatch = ("id_bad", "sum"),                            # packets whose MAC doesn't fit their pseudonym
+        hop_down_count = ("hop_down", "sum"),                       # copies claiming fewer hops than already heard
+        ttl_hop_bad_count = ("ttl_hop_bad", "sum"),                 # frames whose ttl + hop was edited
         # Not features (the model never sees them): the identity seen on air right now,
         # needed to block an unknown radio by its exact (pseudo, mac) pair.
         mac = ("mac", "last"),
@@ -138,7 +159,7 @@ def build_features(df):
         aggs["label"] = ("label", lambda s: s[s != "normal"].iloc[0] if (s != "normal").any() else "normal")
 
     feats = df.groupby(["node", "window"]).agg(**aggs).reset_index() #turns node/window back into normal columns
-    for col in ("orig_count", "dup_tx_count", "mac_count", "id_mismatch"):
+    for col in ("orig_count", "dup_tx_count", "mac_count", "id_mismatch", "hop_down_count", "ttl_hop_bad_count"):
         feats[col] = feats[col].astype(int)
 
     #std of 1 packet is undefined (NaN), so treat it as "no wobble"

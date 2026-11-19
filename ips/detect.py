@@ -28,7 +28,9 @@ FEATURES = ["pkt_count", "hello_count", "rssi_mean", "rssi_std",
             "dup_tx_count",   # msg_ids it had already sent: replay
             "rssi_dev_max",   # jump from this identity's usual signal: spoof (a second radio)
             "mac_count",      # MACs behind one identity in one second: spoof without a copied MAC
-            "id_mismatch"]    # watchtower's id_ok = false: MAC doesn't belong to the pseudonym (spoof, replay)
+            "id_mismatch",    # watchtower's id_ok = false: MAC doesn't belong to the pseudonym (spoof, replay)
+            "hop_down_count",     # copies claiming fewer hops than already heard: forged hop (routing)
+            "ttl_hop_bad_count"]  # ttl + hop isn't the network's fixed sum: edited header (routing)
 
 RF_PATH = "models/rf.joblib"            # where the trained Random Forest is saved for live.py
 IF_PATH = "models/iforest.joblib"       # trained Isolation Forest (for the rule-vs-AI comparison)
@@ -104,7 +106,7 @@ def train_rf(train_feats):
 
 
 def rf_detect(model, feats):
-    """Predicted class for each window: 'normal', 'flood' or 'routing'."""
+    """Predicted class for each window: 'normal', 'flood', 'routing', 'replay' or 'spoof'."""
     return pd.Series(model.predict(feats[FEATURES]), index=feats.index)
 
 
@@ -184,7 +186,7 @@ if __name__ == "__main__":
         "Isolation Forest": evaluate(y_test, iforest_detect(model, test)),
         "Random Forest": evaluate(y_test, test["pred_rf"] != "normal"),
     }
-    print("\n=== Benchmark on test_session (slow flood, routing abuse, replay, node B unplugged) ===")
+    print("\n=== Benchmark on test_session (slow + outsider flood, routing abuse, replay, spoof, node B unplugged) ===")
     for who, s in bench.items():
         print_scores(who[:8], s)
     with open(BENCH_PATH, "w") as f:

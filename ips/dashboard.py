@@ -29,7 +29,7 @@ BAR_SECONDS = 5   # each bar in the traffic chart covers this many seconds
 # Plain-English names for what the model says
 ATTACKS = {
     "flood":   ("Flooding",      "spamming packets far faster than a normal node"),
-    "routing": ("Routing abuse", "fake TTL and extra HELLOs to pull traffic through itself"),
+    "routing": ("Routing abuse", "forging hop counts to look like a shortcut and pull traffic through itself"),
     "replay":  ("Replay",        "re-sending old captured packets"),
     "spoof":   ("Spoofing",      "pretending to be another node"),
     "manual":  ("Manual block",  "blocked by the operator from the dashboard"),
@@ -506,7 +506,7 @@ def live_view():
     with cmp_col, st.container(key="card_compare"):
         st.markdown('<div class="card-title">Rule vs. AI</div>'
                     '<div class="card-sub">Scored on a session none of the models trained on '
-                    '(slow flood, routing abuse, replay, node B unplugged)</div>', unsafe_allow_html=True)
+                    '(slow flood, outsider flood, routing abuse, replay, spoofing, node B unplugged)</div>', unsafe_allow_html=True)
         if os.path.exists(BENCH_PATH):
             with open(BENCH_PATH) as f:
                 bench = json.load(f)

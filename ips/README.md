@@ -41,8 +41,8 @@ dashboard uses template sentences.
 
 | Attack | What the attacker does | Main signals | Response |
 |---|---|---|---|
-| Flooding | Sends packets far faster than a normal node | New messages started per second, packet rate | BLOCK (60 s) |
-| Routing abuse | Advertises a fake route | HELLOs (the boards send none, so any HELLO is odd), TTL | BLOCK (60 s) |
+| Flooding | Sends packets far faster than a normal node (X, or an outsider without the network key) | New messages started per second, packet rate, failed link checks | BLOCK (60 s) |
+| Routing abuse | Relays with a forged low hop count, to look like a shortcut | A copy claiming fewer hops than already heard; `ttl + hop` not adding up to the mesh's fixed sum (5) | BLOCK (60 s) |
 | Replay | Re-sends old captured frames | `msg_id` first heard minutes ago, repeats, MAC doesn't match identity (`id_ok`) | BLOCK (60 s) |
 | Spoofing | Uses another node's identity | Signal jump from that node's usual level, 2 MACs for 1 identity, `id_ok` | **Alert only** (a block would cut off the real victim) |
 | Missing KEYS | A jammer targets one node's key updates | A node that is transmitting but sent 0 KEYS in 60 s | **Alert only** (a BLOCK can't stop a jammer) |
@@ -59,15 +59,17 @@ dashboard uses template sentences.
 **Real hardware** (Nov 18 smoke test, A/B/C + W, 18 min, no attacks, `datasets/2026-11-18_normal_01.jsonl`):
 the Random Forest raised **0 false alarms in 653 windows**, and the live pipeline raised 0 alerts.
 
-**Synthetic test session** (never used for training: slow flood, routing, replay, spoof, jammed KEYS, B unplugged):
+**Synthetic test session** (never used for training: slow flood, outsider flood, forged-hop routing, replay,
+spoof, jammed KEYS, B unplugged):
 
 | Detector | Attacks caught (recall) | Alarms correct (precision) | False alarms (FPR) |
 |---|---|---|---|
-| Rule baseline (`pkts > 15 or HELLOs > 1`) | 25% | 100% | 0.0% |
-| Isolation Forest (unsupervised, trained on normal only) | 58% | 90% | 0.8% |
-| **Random Forest** (supervised, names the attack) | **100%** | **100%** | **0.0%** |
+| Rule baseline (`pkts > 15 or HELLOs > 1`) | 0% | n/a | 0.0% |
+| Isolation Forest (unsupervised, trained on normal only) | 46% | 87% | 1.0% |
+| **Random Forest** (supervised, names the attack) | **99%** | **100%** | **0.0%** |
 
-Rashad's simulator (2,641 normal windows): Random Forest 0% false alarms, Isolation Forest 9%.
+Every attack in the test is deliberately subtle (below the rule's 15 packets/s), which is why the rule catches none.
+Rashad's simulator (2,641 normal windows): Random Forest 0% false alarms, Isolation Forest 6%.
 
 - **Time to block:** 2 s to decide, plus up to 3 s for W to send it (W sends at most one CTRL frame per 3 s).
 - ⚠️ The attacks are still **synthetic**. Real attack recordings from X are needed for a real "caught %".
@@ -78,14 +80,14 @@ Rashad's simulator (2,641 normal windows): Random Forest 0% false alarms, Isolat
 |---|---|
 | `schema.py` | **The only file that knows the watchtower's JSON format** (frames, events, BLOCK / set_time commands) |
 | `ingest.py` | Packets from a recorded `.jsonl` log or the live serial port. Sets W's clock and reconnects if the USB cable drops |
-| `features.py` | Packets → one row per node per 1-second window (15 features) |
+| `features.py` | Packets → one row per node per 1-second window (17 features) |
 | `detect.py` | Rule baseline, Isolation Forest, Random Forest, scoring; saves models + benchmark |
 | `live.py` | Live loop: windows → Random Forest → confirm → BLOCK / ALERT, with evidence |
 | `explain.py` | Local LLM writes one plain sentence per alert; the exact numbers are added by code |
 | `chat.py` | "Ask the watchtower" sidebar chatbot (read-only, grounded in live state + playbook) |
 | `dashboard.py` | Streamlit dashboard |
 | `retention.py` | Auto-delete: traffic logs keep 6 h, chat history 24 h |
-| `synth.py` / `explore.py` | Synthetic labelled data (TTL 5, no HELLOs, like the boards) / data exploration |
+| `synth.py` / `explore.py` | Synthetic labelled data (TTL 5, no HELLOs, attacks from Jose's notes) / data exploration |
 | `datasets/` | Recorded real sessions kept in git (see [datasets/README.md](datasets/README.md)) |
 | `data/` | Private live logs, git-ignored and auto-deleted |
 
