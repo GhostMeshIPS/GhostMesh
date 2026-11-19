@@ -177,8 +177,15 @@ class Sim:
                 if t >= dur:
                     break
                 times.append(t)
+        # chat-like traffic: a few fixed pairs talking both ways (only drawn when asked, so v1 runs are unchanged)
+        pairs = [self.rng.sample(range(self.n), 2) for _ in range(tr.conversations)]
         for idx, t in enumerate(times):
-            src, dst = self.rng.sample(range(self.n), 2)
+            if pairs:
+                src, dst = self.rng.choice(pairs)
+                if self.rng.random() < 0.5:
+                    src, dst = dst, src
+            else:
+                src, dst = self.rng.sample(range(self.n), 2)
             self._push(t, EV_SEND, (src, dst, idx))
 
     def run(self) -> dict:

@@ -58,6 +58,7 @@ class TrafficConfig:
     msg_bytes: int = 32               # laptop message length (<= 152)
     duration_s: float = 120.0         # how long traffic is generated
     drain_s: float = 15.0             # extra time after traffic stops, so retries can finish
+    conversations: int = 0            # 0 = random sender→recipient every message; N = only N fixed pairs, both ways
 
     @property
     def burst_rate_mps(self) -> float:
@@ -165,6 +166,8 @@ class RunConfig:
     def to_dict(self) -> dict:
         d = dataclasses.asdict(self)
         d["routing"]["retry_backoff_ms"] = list(self.routing.retry_backoff_ms)
+        if not self.traffic.conversations:
+            del d["traffic"]["conversations"]     # left out at its default, so older runs keep their run_ids
         return d
 
     @property
@@ -233,6 +236,13 @@ def experiments(seeds: int = SEEDS) -> dict:
         "ttl_sweep": _grid("ttl_sweep", base, seeds,
                            **{"topology.n_nodes": [20, 50],
                               "routing.default_ttl": [5, 8, 12, 14, 16]}),
+
+        # v1 flooding vs v2 route learning (not deployed: scoped TTL leaks recipient distance, §6).
+        # random pairs only save on the ACK; a few ongoing conversations show the most v2 could save
+        "v2_compare": _grid("v2_compare", base, seeds,
+                            **{"topology.n_nodes": [20, 30, 40, 50],
+                               "routing.route_learning": [0, 1],
+                               "traffic.conversations": [0, 5]}),
     }
 
 
