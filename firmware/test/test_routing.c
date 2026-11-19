@@ -46,6 +46,7 @@ static uint16_t epoch_now = 100;
 static uint8_t  blocked_mac[6];
 static bool     block_on;
 static bool   (*drop_fn)(int from, int to, const rt_frame_t *f);
+static int      last_scoped_ttl = -1;      // TTL of the last frame sent with a learned distance (v2)
 
 static int idx_of(void *ctx) { return (int)((tnode_t *)ctx - nodes); }
 
@@ -66,6 +67,8 @@ static const char *EV[] = {
     [RT_LOG_ACK_MATCHED] = "ACK_MATCHED",       [RT_LOG_ACK_UNMATCHED] = "ACK_UNMATCHED",
     [RT_LOG_HELLO] = "HELLO",                   [RT_LOG_TOO_LONG] = "TOO_LONG",
     [RT_LOG_ENCRYPT_FAILED] = "ENCRYPT_FAILED", [RT_LOG_SEND_FAILED] = "SEND_FAILED",
+    [RT_LOG_PEER_EVICTED] = "PEER_EVICTED",   [RT_LOG_ROUTE_SCOPED] = "ROUTE_SCOPED",
+    [RT_LOG_ROUTE_STALE] = "ROUTE_STALE",
 };
 
 static char letter(int i) { return (char)('A' + i); }
@@ -180,6 +183,7 @@ static void cb_notify(void *ctx, uint32_t h, rt_status_t s)
 static void cb_log(void *ctx, rt_log_t ev, const rt_frame_t *f)
 {
     ((tnode_t *)ctx)->log[ev]++;
+    if (ev == RT_LOG_ROUTE_SCOPED && f) last_scoped_ttl = f->ttl;
     if (!verbose) return;
     trace_prefix(idx_of(ctx));
     printf("%-16s", EV[ev] ? EV[ev] : "?");
@@ -203,7 +207,7 @@ static void world(int count, rt_config_t *override)
     memset(nodes, 0, sizeof nodes);
     memset(link_up, 0, sizeof link_up);
     memset(timers, 0, sizeof timers);
-    clock_ms = 1000000; epoch_now = 100; block_on = false; drop_fn = NULL; rng = 12345;
+    clock_ms = 1000000; epoch_now = 100; block_on = false; drop_fn = NULL; rng = 12345; last_scoped_ttl = -1;
     n_nodes = count;
     for (int i = 0; i < count; i++) {
         tnode_t *t = &nodes[i];
@@ -533,6 +537,113 @@ static void test_unsynced_time_beacon(void)
     CHECK(nodes[1].tx == 1,                     "synced: next beacon relayed");
 }
 
+/* ---- v2 route learning (§6) ------------------------------------------------ */
+
+// route learning on, padding off unless asked, so hop counts are exact
+static rt_config_t v2_cfg(uint8_t pad_max)
+{
+    rt_config_t c;
+    rt_default_config(&c, 0);
+    c.route_learning = 1;
+    c.hop_pad_max = pad_max;
+    return c;
+}
+
+// one message from a to b, then let ACKs and any retries finish
+static void exchange(int a, int b) { rt_send(&nodes[a].node, nodes[b].id, HI, 9); run(15000); }
+
+static int total_tx(void) { int t = 0; for (int i = 0; i < n_nodes; i++) t += nodes[i].tx; return t; }
+
+static void test_v2_learn_and_scope(void)
+{
+    rt_config_t c = v2_cfg(0);
+    world(3, &c); connect(0, 1); connect(1, 2);                 // A - B - C
+    CHECK(rt_route_hops(&nodes[0].node, 3) == -1,   "v2: no route before any traffic");
+    exchange(0, 2);
+    CHECK(nodes[2].delivered == 1 && nodes[0].acked == 1, "v2: first message delivered (flooded, no route yet)");
+    CHECK(rt_route_hops(&nodes[2].node, 1) == 1,    "v2: C learned A is 1 relay away");
+    CHECK(nodes[2].log[RT_LOG_ROUTE_SCOPED] == 1,   "v2: C's ACK used the distance it just learned");
+    CHECK(rt_route_hops(&nodes[0].node, 3) == 1,    "v2: A learned C is 1 relay away (from the ACK)");
+    exchange(0, 2);
+    CHECK(nodes[0].log[RT_LOG_ROUTE_SCOPED] == 1,   "v2: A's second message was scoped");
+    CHECK(last_scoped_ttl == 2,                     "v2: scoped TTL = 1 relay + margin 1");
+    CHECK(nodes[2].delivered == 2 && nodes[0].acked == 2, "v2: scoped message delivered and ACKed");
+}
+
+static void test_v2_saves_transmissions(void)
+{
+    // A-B-C-D-E-F, A messages C three times. v1 floods the whole line each time, v2 stops near C
+    int tx[2];
+    for (int v = 0; v < 2; v++) {
+        rt_config_t c = v2_cfg(0);
+        c.route_learning = (uint8_t)v;
+        world(6, &c);
+        for (int i = 0; i < 5; i++) connect(i, i + 1);
+        for (int r = 0; r < 3; r++) exchange(0, 2);
+        CHECK(nodes[2].delivered == 3 && nodes[0].acked == 3, v ? "v2 line: all 3 delivered" : "v1 line: all 3 delivered");
+        int scoped = 0;
+        for (int i = 0; i < 6; i++) scoped += nodes[i].log[RT_LOG_ROUTE_SCOPED];
+        if (!v) CHECK(scoped == 0, "v1 line: route_learning off never scopes");
+        tx[v] = total_tx();
+    }
+    CHECK(tx[1] < tx[0], "v2 line: fewer transmissions than v1 flooding");
+}
+
+static void test_v2_stale_route_floods(void)
+{
+    // learn C over A-B-C (1 relay), then break B-C. the only way left is A-D-E-F-C (3 relays),
+    // longer than the scoped TTL allows, so the first try fails and the retry has to flood
+    rt_config_t c = v2_cfg(0);
+    world(6, &c); connect(0, 1); connect(1, 2);
+    exchange(0, 2);
+    link_up[1][2] = link_up[2][1] = false;
+    connect(0, 3); connect(3, 4); connect(4, 5); connect(5, 2);
+    exchange(0, 2);
+    CHECK(nodes[0].log[RT_LOG_ROUTE_STALE] == 1,    "v2 stale: no ACK, learned distance dropped");
+    CHECK(nodes[2].delivered == 2 && nodes[0].acked == 2, "v2 stale: retry floods and gets through the long way");
+    CHECK(rt_route_hops(&nodes[0].node, 3) == 3,    "v2 stale: relearned the new distance (3 relays)");
+}
+
+static void test_v2_unplug_b(void)
+{
+    // diamond A-B-C / A-D-C. learn the route, unplug B: the path via D is the same length,
+    // so the next message gets through on the first try with no retry
+    rt_config_t c = v2_cfg(0);
+    world(4, &c); connect(0, 1); connect(1, 2); connect(0, 3); connect(3, 2);
+    exchange(0, 2);
+    for (int i = 0; i < 4; i++) link_up[1][i] = link_up[i][1] = false;
+    exchange(0, 2);
+    CHECK(nodes[2].delivered == 2 && nodes[0].acked == 2, "v2 unplug B: next message delivered via D");
+    CHECK(nodes[0].log[RT_LOG_ROUTE_STALE] == 0,    "v2 unplug B: first try worked, no retry needed");
+}
+
+static void test_v2_neighbors(void)
+{
+    // learned from any traffic, so it works with route_learning off too
+    world(3, NULL); connect(0, 1); connect(1, 2);
+    rt_neighbor_t nb[RT_MAX_NEIGHBORS];
+    rt_send(&nodes[0].node, 3, HI, 9);
+    run(2000);
+    CHECK(rt_neighbors(&nodes[1].node, nb, RT_MAX_NEIGHBORS) == 2, "neighbors: B hears A and C");
+    CHECK(rt_neighbors(&nodes[0].node, nb, RT_MAX_NEIGHBORS) == 1, "neighbors: A hears only B");
+    run(7000);
+    CHECK(rt_neighbors(&nodes[1].node, nb, RT_MAX_NEIGHBORS) == 0, "neighbors: forgotten after 6 s of silence");
+}
+
+static void test_v2_hello(void)
+{
+    rt_config_t c;
+    rt_default_config(&c, 0);
+    c.hello_interval_ms = 2000;
+    world(3, &c); connect(0, 1); connect(1, 2);                 // no laptop traffic at all
+    run(5000);
+    rt_neighbor_t nb[RT_MAX_NEIGHBORS];
+    CHECK(rt_neighbors(&nodes[1].node, nb, RT_MAX_NEIGHBORS) == 2, "hello: B finds A and C with no traffic");
+    CHECK(nodes[1].log[RT_LOG_HELLO] >= 4,          "hello: B heard several HELLOs");
+    CHECK(nodes[1].log[RT_LOG_RELAY_SCHEDULED] == 0, "hello: HELLOs are never relayed");
+    CHECK(nodes[0].tx >= 2 && nodes[0].tx <= 3,     "hello: about one HELLO every 2 s");
+}
+
 static void test_long_cache(void)
 {
     world(2, NULL);
@@ -585,6 +696,12 @@ int main(int argc, char **argv)
     RUN(test_ctrl_keys_hello,  "CTRL relayed only if verified; KEYS handed over and flooded; HELLO ignored.");
     RUN(test_unsynced_time_beacon, "Unsynced node takes its first TIME beacon (epoch 0 bug), doesn't relay it.");
     RUN(test_long_cache,       "A replay 90 s later (past the 60 s cache) is still caught.");
+    RUN(test_v2_learn_and_scope,     "v2: learn a distance from traffic, then send with a scoped TTL.");
+    RUN(test_v2_saves_transmissions, "v2: on a 6-node line, scoping uses fewer transmissions than v1.");
+    RUN(test_v2_stale_route_floods,  "v2: path breaks, no ACK, route dropped, retry floods, new distance learned.");
+    RUN(test_v2_unplug_b,            "v2: unplug B in the diamond, next message still gets through via D.");
+    RUN(test_v2_neighbors,           "v2: 1-hop neighbor table from traffic, with expiry.");
+    RUN(test_v2_hello,               "v2: optional HELLO beacons fill the neighbor table, never relayed.");
     RUN(test_hop_padding,      "Originators pad hop_count by 0-2 and keep hop_count + ttl constant.");
 
     printf("\n%d checks: %d passed, %d failed\n", pass + fail, pass, fail);

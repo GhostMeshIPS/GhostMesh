@@ -188,17 +188,45 @@ Every way a frame can be dropped or not relayed, with its log name (`rt_log_t` i
 | `RT_LOG_SEND_FAILED` | send | out of retries, laptop told the message failed |
 | `RT_LOG_PEER_EVICTED` | both | peer table full (`RT_MAX_PEERS`), least recently used peer forgotten. Safe while a node hears from fewer than 8 senders in any 15 s window (§9.7); if duplicates appear alongside it, that limit was hit |
 
-Normal (non-drop) events: `RT_LOG_RELAY_SCHEDULED`, `RT_LOG_TX`, `RT_LOG_DELIVERED`, `RT_LOG_REACK`, `RT_LOG_ACK_MATCHED`, `RT_LOG_ACK_UNMATCHED`.
+Normal (non-drop) events: `RT_LOG_RELAY_SCHEDULED`, `RT_LOG_TX`, `RT_LOG_DELIVERED`, `RT_LOG_REACK`, `RT_LOG_ACK_MATCHED`, `RT_LOG_ACK_UNMATCHED`, and for v2 (§6) `RT_LOG_ROUTE_SCOPED` (a send used a learned distance) and `RT_LOG_ROUTE_STALE` (no ACK, distance dropped, retry floods).
 
 ## 6. Routing (v2: route learning)
 
 _Owner: Rashad_
 
-- HELLO beacons and the neighbor table
-- Reverse-path route learning
-- Directed forwarding with `next_hop`
-- Flood fallback and self-healing
-- Behaviour at epoch boundaries
+Code: `routing.c` (`route_learn`, `build_and_send`, `retry_fire`, `neighbor_seen`, `hello_fire`). v2 is **off by default** (`route_learning = 0`), so the boards run plain v1 flooding unless it's turned on.
+
+### 6.1 Why not next-hop forwarding
+
+The original plan (§4.3) had relays learn routes and forward along `next_hop`. That doesn't work with our privacy design: a relay can't read the destination (it's encrypted), `src_pseudo` only names the last transmitter (Nov 14 decision), and every `msg_id` is random, so there's nothing in the clear a relay could learn a route *to*. Fixing that would need new cleartext fields, and the frame format is frozen. So v2 learns **how far away** a node is instead of **which way**, and uses that to limit how far a flood spreads. `next_hop` stays 0.
+
+### 6.2 Learning distances
+
+Only the two ends of a conversation learn anything, since they're the only ones who can decrypt. When a node decrypts a DATA or ACK from X, the frame's `hop_count` says how many relays it took to get here (plus X's hop padding, so it's an upper bound). The node keeps the smallest one it's seen for X. A bigger value only replaces it once the old one has gone 30 s without being confirmed, so a route that got longer still corrects itself. These distances are stored per **real node ID**, not per pseudonym, so they survive the 60 s rotation.
+
+### 6.3 Scoped sends
+
+When a node sends to a peer it knows the distance to, it uses `ttl = distance + 1` (the margin) instead of the default TTL, never more than the default. The flood still goes out in every direction, but it stops a hop past the recipient instead of covering the whole mesh. Hop padding still applies, so the originator stays hidden.
+
+- **New messages** use the learned distance.
+- **ACKs** use the hop count of the copy they're answering, since that copy just proved a path of that length exists right now. Using the remembered distance here would break if the old shorter path had died.
+- **Retries** always flood with the default TTL (see below).
+
+### 6.4 Flood fallback and self-healing
+
+If a scoped message doesn't get ACKed, the learned distance might be wrong or the path might have broken. So on the first retry the node forgets the distance (logs `ROUTE_STALE`) and the retry floods with the default TTL. The distance gets relearned from whatever reply makes it back. Unplugging B in the demo diamond doesn't even need this: the path through D is the same length, so the next scoped message just goes through D.
+
+### 6.5 Neighbor table and HELLO
+
+`src_pseudo` is always the last transmitter, so every valid frame a node hears comes straight from a 1-hop neighbor. The node keeps those in a small table (16 entries) and forgets any it hasn't heard from in 6 s. `rt_neighbors()` returns the live ones for the serial neighbor table. Optional HELLO beacons (`hello_interval_ms`, off by default) let nodes find each other with no traffic. A HELLO has `ttl = 0`, is never relayed, and fills the rest of the frame with random bytes so it looks like any other frame. They cost airtime (every node, every interval), which is why they're off unless needed.
+
+### 6.6 Epoch boundaries
+
+Neighbors are stored by pseudonym, so at each rotation the old entries just age out after 6 s and the new pseudonyms show up as new neighbors. Learned distances are stored by real node ID, so rotation doesn't affect them.
+
+### 6.7 Privacy cost
+
+Hop padding (§9.9) keeps `hop_count + ttl` the same on every frame. A scoped frame has a smaller sum, so a sniffer can tell it's scoped and roughly how far its recipient is. That's the metadata cost of v2, and it's why v2 is opt-in. The sim (`route_learning = 1`) measures how much it saves.
 
 ## 7. Reliability
 
@@ -506,8 +534,11 @@ _Owner: Rashad + Jose_
 | Relay jitter window | TBD | Planned 10–50 ms. Must be at least 2–3× the airtime of k frames |
 | Suppression threshold k | 2 | From the sim's `k_sweep` (50 nodes, 300 and 1000 kbps, commit `72c8408`): k = 1 loses messages to coverage holes; k = 3 cuts tail latency but costs more transmissions and collisions. See `docs/results/sim-results.md` |
 | Frame airtime | TBD | Estimated ~3 ms per 240-byte frame at 1 Mbps; measure on hardware later |
-| HELLO interval | TBD | |
-| Neighbor expiry | TBD | |
+| Route learning (v2) | Off | `route_learning`. On = scoped sends (§6). Off on the boards for now |
+| Scope margin | 1 hop | Added to the learned distance (§6.3) |
+| Route expiry | 30 s | Learned distance forgotten if not confirmed (§6.2) |
+| HELLO interval | Off | Optional (§6.5). Neighbors are learned from traffic anyway; HELLO costs airtime |
+| Neighbor expiry | 6 s | §6.5 |
 | ACK timeout / retries / backoff | TBD | |
 | Epoch length | 60 s | `floor(unix_s / 60) mod 65536` (§9.2) |
 | Jitter random share | 50% | From the sim's `jitter_sweep` (50 nodes, 1000 kbps, commit `71f7fd0`): fewest collisions of 12 / 25 / 50% with the same delivery, at a small cost in median latency. The 20 ms random part is still 2–3 frame airtimes at 300 kbps (§5.3 timing rule) |

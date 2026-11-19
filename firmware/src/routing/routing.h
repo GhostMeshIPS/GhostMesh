@@ -20,6 +20,7 @@
 #define RT_SEQ_MEMORY        16    // recent seqs remembered per peer (§9.7)
 #define RT_MAX_PENDING_ACKS  8     // ACKs waiting out their random delay
 #define RT_MAX_TX_TRACK      16    // transmitters tracked for the insertion limit (§9.9)
+#define RT_MAX_NEIGHBORS     16    // 1-hop neighbors tracked (v2, §6)
 #define RT_BODY_MAX          152   // plaintext message bytes (§9.5, was 153)
 
 /* ---- Frame (§4.1, offsets in §9.4) -------------------------------------
@@ -89,6 +90,9 @@ typedef enum {
     RT_LOG_ENCRYPT_FAILED,
     RT_LOG_SEND_FAILED,           // out of retries
     RT_LOG_PEER_EVICTED,          // peer table full: least recently used peer forgotten
+    // v2 route learning (§6)
+    RT_LOG_ROUTE_SCOPED,          // send used a learned distance instead of the default TTL
+    RT_LOG_ROUTE_STALE,           // no ACK: learned distance dropped, retry floods with the default TTL
 } rt_log_t;
 
 typedef enum { RT_STATUS_SENT, RT_STATUS_DELIVERED, RT_STATUS_FAILED } rt_status_t;
@@ -146,6 +150,12 @@ typedef struct {
     uint32_t fresh_ms;             // recipient freshness window, 5 s
     uint32_t seq_memory_ms;        // how long a peer's seq counts as seen, 15 s
     uint32_t retry_backoff_ms[RT_MAX_ATTEMPTS - 1]; // e.g. 1000, 2000, 4000
+    // v2 route learning (§6). route_learning = 0 keeps plain v1 flooding
+    uint8_t  route_learning;       // 1 = scope sends to a learned distance
+    uint8_t  scope_margin;         // extra hops on top of the learned distance
+    uint16_t hello_interval_ms;    // HELLO beacon period, 0 = off (neighbors are still learned from traffic)
+    uint32_t neighbor_expiry_ms;   // neighbor forgotten after this long without hearing it
+    uint32_t route_expiry_ms;      // learned distance forgotten after this long without being confirmed
 } rt_config_t;
 
 /* ---- Node state --------------------------------------------------------
@@ -188,6 +198,9 @@ typedef struct {
     uint32_t      peer_id;         // real node ID
     uint32_t      next_seq_tx;     // next seq when sending to this peer (random start, §9.7)
     uint32_t      last_used_ms;    // last send to / delivery from this peer (for eviction)
+    bool          route_known;     // v2: have a fresh distance to this peer
+    uint8_t       route_hops;      // v2: fewest relays seen on a frame from this peer (incl. its padding)
+    uint32_t      route_seen_ms;   // v2: when that distance was last confirmed
     rt_seq_seen_t seen[RT_SEQ_MEMORY]; // seqs delivered from this peer recently
 } rt_peer_t;
 
@@ -196,6 +209,7 @@ typedef struct {
     uint32_t recipient_id;
     uint32_t seq;
     uint8_t  acked_msg_id[8];
+    uint8_t  hops;                 // v2: hop_count of the copy being ACKed (a path that exists right now)
 } rt_pending_ack_t;
 
 typedef struct {
@@ -205,6 +219,13 @@ typedef struct {
     uint32_t window_start_ms;
     uint16_t count;
 } rt_tx_track_t;
+
+typedef struct {
+    bool     used;
+    uint8_t  pseudo[4];            // neighbor's current pseudonym (changes every epoch)
+    int8_t   rssi;                 // last signal strength heard from it
+    uint32_t last_heard_ms;
+} rt_neighbor_t;
 
 typedef struct {
     rt_config_t          cfg;
@@ -217,6 +238,7 @@ typedef struct {
     rt_peer_t            peers[RT_MAX_PEERS];
     rt_pending_ack_t     acks[RT_MAX_PENDING_ACKS];
     rt_tx_track_t        tx_track[RT_MAX_TX_TRACK];
+    rt_neighbor_t        neighbors[RT_MAX_NEIGHBORS];
     uint32_t             next_handle;
 } rt_node_t;
 
@@ -236,5 +258,11 @@ uint32_t rt_send(rt_node_t *n, uint32_t recipient_id, const uint8_t *text, uint8
 
 // a timer started with timer_start() fired
 void rt_on_timer(rt_node_t *n, uint32_t token);
+
+// v2: copies the live 1-hop neighbors into out (up to max) and returns how many. for the serial neighbor table
+int rt_neighbors(rt_node_t *n, rt_neighbor_t *out, int max);
+
+// v2: learned distance (relays) to a peer, or -1 if unknown / expired
+int rt_route_hops(rt_node_t *n, uint32_t peer_id);
 
 #endif /* GHOSTMESH_ROUTING_H */

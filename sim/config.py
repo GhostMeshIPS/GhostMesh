@@ -100,6 +100,12 @@ class RoutingParams:
     fresh_ms: int = 5000
     seq_memory_ms: int = 15000
     retry_backoff_ms: tuple = (1000, 2000, 4000)
+    # v2 route learning (PROTOCOL.md §6). route_learning = 0 is plain v1 flooding
+    route_learning: int = 0
+    scope_margin: int = 1
+    hello_interval_ms: int = 0
+    neighbor_expiry_ms: int = 6000
+    route_expiry_ms: int = 30000
 
 
 class RtConfig(ctypes.Structure):
@@ -123,6 +129,11 @@ class RtConfig(ctypes.Structure):
         ("fresh_ms",             ctypes.c_uint32),
         ("seq_memory_ms",        ctypes.c_uint32),
         ("retry_backoff_ms",     ctypes.c_uint32 * 3),
+        ("route_learning",       ctypes.c_uint8),
+        ("scope_margin",         ctypes.c_uint8),
+        ("hello_interval_ms",    ctypes.c_uint16),
+        ("neighbor_expiry_ms",   ctypes.c_uint32),
+        ("route_expiry_ms",      ctypes.c_uint32),
     ]
 
 

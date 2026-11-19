@@ -8,7 +8,7 @@
 #include <string.h>
 
 /* ---- Timer tokens: kind in the top byte, table slot below ------------- */
-enum { RT_TIMER_RELAY = 1, RT_TIMER_RETRY = 2, RT_TIMER_ACK = 3 };
+enum { RT_TIMER_RELAY = 1, RT_TIMER_RETRY = 2, RT_TIMER_ACK = 3, RT_TIMER_HELLO = 4 };
 
 static uint32_t make_token(uint8_t kind, uint32_t slot) { return ((uint32_t)kind << 24) | (slot & 0xFFFFFFu); }
 static uint8_t  token_kind(uint32_t token)              { return (uint8_t)(token >> 24); }
@@ -39,15 +39,21 @@ static bool epoch_ok(rt_node_t *n, const rt_frame_t *f);
 static bool is_fresh(rt_node_t *n, uint32_t timestamp);
 static void handle_ack(rt_node_t *n, const rt_inner_t *in, const rt_frame_t *f);
 static void handle_data(rt_node_t *n, const rt_inner_t *in, const rt_frame_t *f);
-static void queue_ack(rt_node_t *n, uint32_t recipient_id, uint32_t seq, const uint8_t msg_id[8]);
+static void queue_ack(rt_node_t *n, uint32_t recipient_id, uint32_t seq, const uint8_t msg_id[8], uint8_t hops);
 static void ack_fire(rt_node_t *n, int slot);
 static void relay_schedule(rt_node_t *n, int slot, const rt_frame_t *f, int8_t rssi);
 static void relay_fire(rt_node_t *n, int slot);
 static uint32_t jitter_ms(rt_node_t *n, int8_t rssi);
 static bool build_and_send(rt_node_t *n, uint8_t type, uint32_t recipient_id, uint32_t seq,
-                           const uint8_t *body, uint8_t len, int out_slot);
+                           const uint8_t *body, uint8_t len, int out_slot, int scope_hops);
 static void retry_fire(rt_node_t *n, int out_slot);
 static rt_peer_t *peer_get(rt_node_t *n, uint32_t peer_id);
+static rt_peer_t *peer_find(rt_node_t *n, uint32_t peer_id);
+static void route_learn(rt_node_t *n, uint32_t peer_id, uint8_t hops);
+static int  route_hops_fresh(rt_node_t *n, uint32_t peer_id);
+static bool route_forget(rt_node_t *n, uint32_t peer_id);
+static void neighbor_seen(rt_node_t *n, const uint8_t pseudo[4], int8_t rssi);
+static void hello_fire(rt_node_t *n);
 static bool seq_seen(rt_node_t *n, const rt_peer_t *peer, uint32_t seq);
 static void seq_remember(rt_node_t *n, rt_peer_t *peer, uint32_t seq);
 
@@ -75,6 +81,12 @@ void rt_default_config(rt_config_t *cfg, uint32_t node_id)
     cfg->retry_backoff_ms[0]  = 1000;
     cfg->retry_backoff_ms[1]  = 2000;
     cfg->retry_backoff_ms[2]  = 4000;
+    // v2 route learning (§6): off by default, so the boards run plain v1 flooding unless it's turned on
+    cfg->route_learning       = 0;
+    cfg->scope_margin         = 1;
+    cfg->hello_interval_ms    = 0;
+    cfg->neighbor_expiry_ms   = 6000;
+    cfg->route_expiry_ms      = 30000;
 }
 
 void rt_init(rt_node_t *n, const rt_config_t *cfg, const rt_platform_t *p, void *ctx)
@@ -84,6 +96,11 @@ void rt_init(rt_node_t *n, const rt_config_t *cfg, const rt_platform_t *p, void 
     n->p = p;
     n->ctx = ctx;
     n->next_handle = 1; /* 0 means "rejected" */
+
+    // v2: first HELLO at a random point in the interval, so nodes that boot together don't beacon together
+    if(n->cfg.hello_interval_ms){
+        n->p->timer_start(n->ctx, make_token(RT_TIMER_HELLO, 0), 1 + n->p->random_u32(n->ctx) % n->cfg.hello_interval_ms);
+    }
 }
 
 void rt_on_receive(rt_node_t *n, const rt_frame_t *f, const uint8_t src_mac[6], int8_t rssi)
@@ -114,7 +131,10 @@ void rt_on_receive(rt_node_t *n, const rt_frame_t *f, const uint8_t src_mac[6], 
         return;
     }
 
-    // HELLO is 1 hop only and v1 doesn't use it (v2 route learning will). unknown types get dropped
+    // v2: src_pseudo is always the last transmitter, so whoever sent this valid frame is a 1-hop neighbor
+    neighbor_seen(n, f->src_pseudo, rssi);
+
+    // HELLO is 1 hop only: it already did its job above (neighbor table), so stop here. unknown types get dropped
     if(f->ver_type == RT_FRAME_HELLO){
         n->p->log(n->ctx, RT_LOG_HELLO, f);
         return;
@@ -225,7 +245,7 @@ uint32_t rt_send(rt_node_t *n, uint32_t recipient_id, const uint8_t *text, uint8
     memcpy(o->text, text, len);
 
     // first attempt
-    if(!build_and_send(n, RT_TYPE_DATA, recipient_id, o->seq, o->text, o->len, slot)){
+    if(!build_and_send(n, RT_TYPE_DATA, recipient_id, o->seq, o->text, o->len, slot, route_hops_fresh(n, recipient_id))){
         memset(o, 0, sizeof *o);
         return 0;
     }
@@ -242,6 +262,7 @@ void rt_on_timer(rt_node_t *n, uint32_t token)
     case RT_TIMER_RELAY: if (slot < RT_CACHE_SIZE)       relay_fire(n, (int)slot); break;
     case RT_TIMER_RETRY: if (slot < RT_MAX_OUTSTANDING)  retry_fire(n, (int)slot); break;
     case RT_TIMER_ACK:   if (slot < RT_MAX_PENDING_ACKS) ack_fire(n, (int)slot);   break;
+    case RT_TIMER_HELLO: hello_fire(n); break;
     default: break;
     }
 }
@@ -395,6 +416,9 @@ static void handle_ack(rt_node_t *n, const rt_inner_t *in, const rt_frame_t *f)
         return;
     }
 
+    // v2: this ACK just told us how far away the recipient is
+    route_learn(n, in->sender_id, f->hop_count);
+
     // (MNR) the ACK body is the msg_id it acks. any attempt's msg_id counts, since retries get new ones
     for(int i = 0; i < RT_MAX_OUTSTANDING; i++){
         rt_outstanding_t *o = &n->out[i];
@@ -423,6 +447,9 @@ static void handle_data(rt_node_t *n, const rt_inner_t *in, const rt_frame_t *f)
         return;
     }
 
+    // v2: learn how far away the sender is (the ACK below gets scoped with it)
+    route_learn(n, in->sender_id, f->hop_count);
+
     // (SEQ) have we already delivered this seq from this sender recently?
     rt_peer_t *peer = peer_get(n, in->sender_id);
     bool seen = peer && seq_seen(n, peer, in->seq);
@@ -437,11 +464,13 @@ static void handle_data(rt_node_t *n, const rt_inner_t *in, const rt_frame_t *f)
     }
 
     // either way the sender gets an ACK for this attempt's msg_id
-    queue_ack(n, in->sender_id, in->seq, f->msg_id);
+    queue_ack(n, in->sender_id, in->seq, f->msg_id, f->hop_count);
 }
 
 // ACKs wait a random 0..ack_delay_max_ms so timing doesn't link sender and recipient (§9.7)
-static void queue_ack(rt_node_t *n, uint32_t recipient_id, uint32_t seq, const uint8_t msg_id[8])
+// hops = hop_count of the copy being ACKed. v2 scopes the ACK with that, not the remembered minimum:
+// that copy just proved a path of that length exists right now, even if an older shorter one broke
+static void queue_ack(rt_node_t *n, uint32_t recipient_id, uint32_t seq, const uint8_t msg_id[8], uint8_t hops)
 {
     for(int i = 0; i < RT_MAX_PENDING_ACKS; i++){
         rt_pending_ack_t *a = &n->acks[i];
@@ -451,6 +480,7 @@ static void queue_ack(rt_node_t *n, uint32_t recipient_id, uint32_t seq, const u
         a->recipient_id = recipient_id;
         a->seq = seq;
         memcpy(a->acked_msg_id, msg_id, 8);
+        a->hops = hops;
 
         uint32_t delay = n->cfg.ack_delay_max_ms ? n->p->random_u32(n->ctx) % ((uint32_t)n->cfg.ack_delay_max_ms + 1) : 0;
         n->p->timer_start(n->ctx, make_token(RT_TIMER_ACK, (uint32_t)i), delay);
@@ -458,7 +488,7 @@ static void queue_ack(rt_node_t *n, uint32_t recipient_id, uint32_t seq, const u
     }
 
     //no free slot, so just send it now instead of losing it
-    build_and_send(n, RT_TYPE_ACK, recipient_id, seq, msg_id, 8, -1);
+    build_and_send(n, RT_TYPE_ACK, recipient_id, seq, msg_id, 8, -1, hops);
 }
 
 static void ack_fire(rt_node_t *n, int slot)
@@ -469,7 +499,7 @@ static void ack_fire(rt_node_t *n, int slot)
     //copy out first, then free the slot before sending
     rt_pending_ack_t ack = *a;
     memset(a, 0, sizeof *a);
-    build_and_send(n, RT_TYPE_ACK, ack.recipient_id, ack.seq, ack.acked_msg_id, 8, -1);
+    build_and_send(n, RT_TYPE_ACK, ack.recipient_id, ack.seq, ack.acked_msg_id, 8, -1, ack.hops);
 }
 
 /* ---- Relay timing (§5.3) ------------------------------------------------ */
@@ -539,8 +569,10 @@ static void relay_fire(rt_node_t *n, int slot)
 /* ---- Send path (§5.2) --------------------------------------------------- */
 
 // builds one frame and sends it. used for new messages, retries (out_slot >= 0) and ACKs (out_slot = -1)
+// scope_hops: how far away the recipient is (v2), or -1 to use the default TTL.
+// new messages pass the learned distance, ACKs pass the hops of the copy they answer, retries pass -1
 static bool build_and_send(rt_node_t *n, uint8_t type, uint32_t recipient_id, uint32_t seq,
-                           const uint8_t *body, uint8_t len, int out_slot)
+                           const uint8_t *body, uint8_t len, int out_slot, int scope_hops)
 {
     // nothing goes out before the first clock sync (§9.2)
     if(!n->p->is_synced(n->ctx)){
@@ -582,6 +614,14 @@ static bool build_and_send(rt_node_t *n, uint8_t type, uint32_t recipient_id, ui
     if(pad > n->cfg.default_ttl) pad = n->cfg.default_ttl;
     f.hop_count = pad;
     f.ttl = (uint8_t)(n->cfg.default_ttl - pad);
+
+    // v2: if we know how far the recipient is, only flood that far (+ margin) instead of the whole mesh.
+    // never more than the normal TTL, and the padding above still hides the originator
+    int hops = n->cfg.route_learning ? scope_hops : -1;
+    if(hops >= 0){
+        uint32_t scope = (uint32_t)hops + n->cfg.scope_margin;
+        if(scope < f.ttl) f.ttl = (uint8_t)scope;
+    }
     n->p->my_pseudonym(n->ctx, f.src_pseudo);
     memset(f.next_hop, 0, 4);                                              // v1 always floods
 
@@ -605,6 +645,7 @@ static bool build_and_send(rt_node_t *n, uint8_t type, uint32_t recipient_id, ui
     }
 
     // (TRANSMIT) originator sends right away, no jitter
+    if(hops >= 0) n->p->log(n->ctx, RT_LOG_ROUTE_SCOPED, &f);
     n->p->transmit(n->ctx, &f);
     n->p->log(n->ctx, RT_LOG_TX, &f);
     return true;
@@ -623,8 +664,12 @@ static void retry_fire(rt_node_t *n, int out_slot)
         return;
     }
 
+    // v2: no ACK means the learned distance was wrong or the path broke, so forget it and flood (§4.3 fallback).
+    // it gets relearned from the next frame that does get through
+    if(n->cfg.route_learning && route_forget(n, o->recipient_id)) n->p->log(n->ctx, RT_LOG_ROUTE_STALE, NULL);
+
     // (RETRY) new msg_id + timestamp, SAME seq so the recipient knows it's the same message
-    if(!build_and_send(n, RT_TYPE_DATA, o->recipient_id, o->seq, o->text, o->len, out_slot)){
+    if(!build_and_send(n, RT_TYPE_DATA, o->recipient_id, o->seq, o->text, o->len, out_slot, -1)){
         // couldn't even build it (lost keys/sync), so give up instead of hanging forever
         n->p->notify(n->ctx, o->handle, RT_STATUS_FAILED);
         n->p->log(n->ctx, RT_LOG_SEND_FAILED, NULL);
@@ -692,4 +737,119 @@ static void seq_remember(rt_node_t *n, rt_peer_t *peer, uint32_t seq)
     peer->seen[victim].used = true;
     peer->seen[victim].seq = seq;
     peer->seen[victim].seen_at_ms = now;
+}
+
+/* ---- v2 route learning + neighbors (§6) ----------------------------------- */
+
+// looks a peer up without adding one (a lookup shouldn't evict anybody)
+static rt_peer_t *peer_find(rt_node_t *n, uint32_t peer_id)
+{
+    for(int i = 0; i < RT_MAX_PEERS; i++){
+        if(n->peers[i].used && n->peers[i].peer_id == peer_id) return &n->peers[i];
+    }
+    return NULL;
+}
+
+// a decrypted frame from peer_id arrived with this hop_count. it includes the sender's padding (0-2), so it's
+// an upper bound on the real distance. keep the smallest one seen; a bigger one only replaces it once the old
+// one has expired, so a route that got longer still corrects itself within route_expiry_ms
+static void route_learn(rt_node_t *n, uint32_t peer_id, uint8_t hops)
+{
+    rt_peer_t *p = peer_get(n, peer_id);
+    if(!p) return;
+    uint32_t now = n->p->now_ms(n->ctx);
+    bool expired = !p->route_known || now - p->route_seen_ms > n->cfg.route_expiry_ms;
+
+    if(expired || hops <= p->route_hops){
+        p->route_known = true;
+        p->route_hops = hops;
+        p->route_seen_ms = now;
+    }
+}
+
+// learned distance to a peer, or -1 if we don't have a fresh one
+static int route_hops_fresh(rt_node_t *n, uint32_t peer_id)
+{
+    rt_peer_t *p = peer_find(n, peer_id);
+    if(!p || !p->route_known) return -1;
+    if(n->p->now_ms(n->ctx) - p->route_seen_ms > n->cfg.route_expiry_ms) return -1;
+    return p->route_hops;
+}
+
+// drops a learned distance. returns true if there was one
+static bool route_forget(rt_node_t *n, uint32_t peer_id)
+{
+    rt_peer_t *p = peer_find(n, peer_id);
+    if(!p || !p->route_known) return false;
+    p->route_known = false;
+    return true;
+}
+
+int rt_route_hops(rt_node_t *n, uint32_t peer_id)
+{
+    return route_hops_fresh(n, peer_id);
+}
+
+// remembers a 1-hop neighbor by its current pseudonym. full table: reuse the one heard from longest ago.
+// pseudonyms rotate every epoch, so old entries just age out after neighbor_expiry_ms
+static void neighbor_seen(rt_node_t *n, const uint8_t pseudo[4], int8_t rssi)
+{
+    uint32_t now = n->p->now_ms(n->ctx);
+    rt_neighbor_t *victim = NULL;
+    uint32_t oldest_age = 0;
+
+    for(int i = 0; i < RT_MAX_NEIGHBORS; i++){
+        rt_neighbor_t *e = &n->neighbors[i];
+        if(e->used && memcmp(e->pseudo, pseudo, 4) == 0){            // already known: refresh it
+            e->rssi = rssi;
+            e->last_heard_ms = now;
+            return;
+        }
+        uint32_t age = e->used ? now - e->last_heard_ms : UINT32_MAX; // free slots count as oldest
+        if(!victim || age > oldest_age){ victim = e; oldest_age = age; }
+    }
+
+    victim->used = true;
+    memcpy(victim->pseudo, pseudo, 4);
+    victim->rssi = rssi;
+    victim->last_heard_ms = now;
+}
+
+int rt_neighbors(rt_node_t *n, rt_neighbor_t *out, int max)
+{
+    uint32_t now = n->p->now_ms(n->ctx);
+    int count = 0;
+    for(int i = 0; i < RT_MAX_NEIGHBORS && count < max; i++){
+        const rt_neighbor_t *e = &n->neighbors[i];
+        if(e->used && now - e->last_heard_ms <= n->cfg.neighbor_expiry_ms) out[count++] = *e;
+    }
+    return count;
+}
+
+// HELLO beacon: 1 hop only (ttl 0). the rest of the frame is random so it looks like any other frame on the air
+static void hello_fire(rt_node_t *n)
+{
+    uint32_t iv = n->cfg.hello_interval_ms;
+    if(!iv) return;
+
+    //next one at the interval +/- 10% so neighbors don't stay in lockstep
+    uint32_t spread = iv / 10;
+    uint32_t next = iv - spread + (spread ? n->p->random_u32(n->ctx) % (2 * spread + 1) : 0);
+    n->p->timer_start(n->ctx, make_token(RT_TIMER_HELLO, 0), next);
+
+    if(!n->p->is_synced(n->ctx)) return;                             // nothing goes out before sync (§9.2)
+
+    rt_frame_t f;
+    memset(&f, 0, sizeof f);
+    random_bytes(n, f.msg_id, 8);
+    f.ver_type = RT_FRAME_HELLO;
+    n->p->my_pseudonym(n->ctx, f.src_pseudo);
+    put_be16(f.epoch, n->p->current_epoch(n->ctx));
+    random_bytes(n, f.nonce, (int)sizeof f.nonce);
+    random_bytes(n, f.ciphertext, (int)sizeof f.ciphertext);
+    random_bytes(n, f.aead_tag, (int)sizeof f.aead_tag);
+    n->p->compute_link_tag(n->ctx, &f, f.link_tag);                  // link_tag last
+
+    n->p->transmit(n->ctx, &f);
+    n->p->log(n->ctx, RT_LOG_TX, &f);
 }
