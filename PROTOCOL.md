@@ -390,10 +390,100 @@ Documented, not fixed:
 
 ## 10. Serial protocol (node ⇄ laptop)
 
-_Owner: Yunus_
+_Owner: Yunus. Implemented in `firmware/src/node_serial.cpp` + `main.cpp` (nodes), `firmware/src/watchtower/main_w.cpp` (W),
+event text in `firmware/src/node/gm_node.c` and `firmware/src/watchtower/gm_watch.c`. Reference client: `tools/chat_client.py`._
 
-- Commands (laptop → node)
-- Events (node → laptop)
+### 10.1 Rules
+
+| # | Rule |
+|---|---|
+| D1 | USB serial (the S3's native USB; the baud setting is ignored). **One JSON object per line**, UTF-8, `\n`-terminated, ≤ 1 KB. Lines that don't start with `{` are debug output: ignore them. |
+| D2 | **Opening (or closing) the port can reset the board**, which wipes the watchtower's clock. Open with DTR and RTS low (`s = serial.Serial(); s.port = P; s.dtr = False; s.rts = False; s.open()`), but on Windows the driver may still reset it (Nov 18). So: **a host talking to W re-sends `set_time` whenever W reports `warning clock_not_set`**, and keeps one session open where it can. |
+| D3 | Three kinds of line: **commands** (laptop → board) have `"cmd"`; **events** (board → laptop) have `"ev"`; **watchtower frame lines** have neither and follow §11 / `ips/schema.py`. |
+| D4 | Boards are named by **letter** on serial: `"A"`–`"D"` nodes, `"W"` watchtower, `"X"` attacker. Numeric ids appear only inside frames. |
+| D5 | Watchtower frame lines carry `t` = **mesh clock**, unix seconds with ms precision. Before W's clock is set, `t` is local boot time (`t < 1e9`) and `node` is `"?"`: drop those lines. Laptop tools stamp their own arrival time (the IPS adds `rx_t`). |
+| D6 | Both sides **ignore unknown fields**, so new fields never break an older reader. An unknown command gets `{"ev":"error","reason":"unknown_cmd"}`. |
+| D7 | A board prints **nothing** when no host has the port open (output isn't buffered). Nodes on power banks never stall; logs only cover connected time, so **W must stay connected**. |
+| D8 | Commands marked **bench** exist for testing without W and are compiled out of the demo build. |
+
+### 10.2 Node commands (A–D)
+
+| Command | Fields | Reply |
+|---|---|---|
+| `send` | `to` (letter), `text` (≤ 152 bytes UTF-8) | `sent`, later `delivered` or `failed`. Before the clock syncs: `queued` (up to 8 wait) |
+| `status` | | `status`, `radio` |
+| `auto` | `to` (letter, `""` = off), `every_s` (0 = off) | `auto`. Sends `auto <me>#<n>` to `to` every `every_s` s once synced. **Saved in flash.** |
+| `verbose` | `on` (bool) | none. On: print every routing log event, not just the important ones |
+| `txpower` | `qdbm` (8–84, quarter-dBm; 8 = 2 dBm) | `radio`. Saved |
+| `rssi_gate` | `dbm` (−127 = off) | `radio`. Saved. Frames weaker than this are dropped before routing |
+| `allow` | `macs` (list of `"aa:bb:cc:dd:ee:ff"`, empty = off) | `radio`. Only frames from these MACs reach routing. Use with MAC rotation off. Not saved |
+| `rotate_mac` | `on` (bool) | `warning` `reboot_to_apply_rotate_mac`. Saved |
+| `wipe_state` | | `state_wiped`, reboots. Clears the saved ratchet state (after re-running keygen) |
+| `reboot` | | reboots |
+| `set_time` **bench** | `unix_ms` | `debug_time`. Sets the clock as if a TIME beacon arrived |
+
+### 10.3 Node events
+
+| Event | Fields | When |
+|---|---|---|
+| `boot` | `name`, `id`, `fw`, `peers`, `fp{self,network,watchtower}` | after reset. Compare `fp` with `firmware/config/roster.json` |
+| `synced` | `epoch`, `mac_outage_us` | clock synced for the first time since boot |
+| `epoch` | `epoch`, `pseudo`, `mac_outage_us` | every epoch change (new pseudonym + MAC) |
+| `queued` | `to`, `waiting` | `send` before sync |
+| `sent` / `delivered` / `failed` | `to`, `handle` | first transmission / ACK received / out of retries |
+| `rx` | `from`, `text`, `seq`, `rssi` | a message for this node |
+| `log` | `what`, `msg_id`, `ttl`, `hop` | routing event (names = `rt_log_t`, §5.4). Always for `bad_link_tag`, `bad_epoch`, `blocked`, `ctrl_unverified`, `replay_stale`, `rate_limited`, `too_long`, `encrypt_failed`, `peer_evicted`; all of them with `verbose` |
+| `block` / `unblock` | `block_id`, `pseudo`, `reason` / `block_id` | a signed BLOCK applied / ended |
+| `no_beacon` | `secs` | no TIME beacon for 30 s |
+| `no_dh` / `resync` | `peer` | §9.6 alerts for that peer |
+| `first_beacon` | | first TIME beacon taken by the unsynced-node workaround (decision log, Nov 17) |
+| `auto` | `to`, `every_s` | after the `auto` command |
+| `status` | `name`, `synced`, `mesh_ms`, `epoch`, `pseudo`, counters (`rx`, `tx`, `keys_sent`, `beacons`, `delivered`, `acked`, `failed`, `relayed`, `dup`, `cancelled`, `bad_link_tag`, `bad_epoch`, `blocked`, `not_synced`, `stale`, `rate_limited`, `gate_drops`, `allow_drops`), `queued`, `mac_outage_us` | `status` |
+| `radio` | `airtime_avg_us`, `rx_overflow`, `tx_fail`, `free_heap`, `rotate_mac`, `rssi_gate`, `allow_n`, `auto_to`, `auto_every_s` | `status` and settings commands |
+| `oled` | `present`, `addr` | at boot |
+| `debug_time` | `accepted`, `unix_ms` | `set_time` (bench) |
+| `warning` / `error` | `reason` (+ details) | see 10.6 |
+
+### 10.4 Watchtower commands (W)
+
+| Command | Fields | Reply |
+|---|---|---|
+| `set_time` | `unix_ms` | `clock_set`. Starts the mesh clock; TIME beacon every 10 s from then on. W nags with `warning clock_not_set` every 5 s until it gets one |
+| `status` | | `status`, `radio` |
+| `block` | `node` (letter, or `"?"` with `pseudo` + `mac`), `reason` (`flood`/`replay`/`spoof`/`routing`, else 0), `until` (unix **seconds**, float; default now + 120 s) | `block_queued`, then `block_sent` within ≤ 3 s. Node blocks are re-issued every epoch (they follow the node across rotation); `?` pair blocks end at the next rotation (O9). Same format as `ips/schema.py` `make_block_cmd` |
+| `unblock` | `node`, or `"?"` + `pseudo` + `mac` | `unblock_sent` (or `error no_such_block`) |
+| `txpower` | `qdbm` | none. Saved |
+| `reboot` | | reboots (the clock is lost: send `set_time` again) |
+
+W sends at most one CTRL frame per 3 s (unblock, then block, then beacon), so a BLOCK can wait up to 3 s
+and a beacon can slip by up to 3 s (decision log, Nov 17).
+
+### 10.5 Watchtower events
+
+| Event | Fields | When |
+|---|---|---|
+| (frame line) | §11 fields + `node`, `id_ok`, `epoch`, `flags`, `rx_us`, `rate`, `sig_mode`, `mcs`, `raw` | **every frame W hears**, including relayed copies of its own beacons (`node: "W"`) |
+| `boot` | `name`, `id`, `fw`, `peers`, `mac`, `fp{self,network,watchtower}` | after reset |
+| `clock_set` | `unix_ms`, `epoch` | `set_time` |
+| `epoch` | `epoch`, `blocks_reissued` | every epoch change |
+| `block_queued` / `block_sent` / `unblock_sent` | `block_id`, `node` / + `reason`, `until_ms` / `block_id` | BLOCK lifecycle |
+| `status` | `name`, `clock_set`, `mesh_ms`, `epoch`, `frames`, `beacons`, `blocks_sent`, `unknown`, `bad_link_tag`, `nodes{<letter>:{frames,rssi}}` | `status` |
+| `radio` | `airtime_avg_us`, `rx_overflow`, `tx_fail`, `free_heap` | `status` |
+
+BLOCK `reason` codes inside the frame: 0 other, 1 flood, 2 replay, 3 spoof, 4 routing.
+
+### 10.6 Errors and warnings (`reason`)
+
+| Board | Reasons |
+|---|---|
+| any | `bad_json`, `unknown_cmd`, `cmd_queue_full`, `line_too_long`, `espnow_init_failed`, `set_mac_failed` (+`esp_err`) |
+| node | `bad_to`, `too_long`, `unknown_peer`, `busy` (8 messages already waiting for ACKs), `queue_full`, `bad_unix_ms`, `timer_table_full`, `add_peer_failed`, `state_import_failed`; warnings `allowlist_needs_rotate_mac_off`, `reboot_to_apply_rotate_mac` |
+| W | `bad_node`, `pair_block_needs_pseudo`, `unknown_node`, `clock_not_set`, `block_table_full`, `no_such_block`, `ctrl_sign_failed`, `bad_unix_ms`; warning `clock_not_set` |
+
+### 10.7 Laptop-side extras (`tools/chat_client.py`)
+
+Not part of the board protocol, but written into `--log` files: `{"ev":"mark","t":<laptop unix s>,"note":"..."}`
+for ground-truth notes (`/mark`, and automatically on `/block` / `/unblock`).
 
 ## 11. Watchtower log schema
 
