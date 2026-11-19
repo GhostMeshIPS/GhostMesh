@@ -7,7 +7,7 @@ Everything downstream (live.py, dashboard) can't tell the difference.
 """
 import time
 import pandas as pd
-from schema import parse_line
+from schema import encode_cmd, make_set_time_cmd, needs_clock, parse_event, parse_line
 
 BAUD = 921600   # watchtower serial speed
 
@@ -64,22 +64,54 @@ def replay(path, speed=1.0):
 
 
 def open_serial(port):
-    """Open the watchtower's USB serial port, e.g. /dev/tty.usbserial-0001 on a Mac."""
+    """Open the watchtower's USB serial port, e.g. /dev/cu.usbmodem1101 on a Mac.
+
+    DTR and RTS are set LOW before opening: toggling them is how the ESP32's USB port resets the
+    board, and a reset wipes W's clock (PROTOCOL.md 10.1 D2). It can still reset on some drivers,
+    which is why serial_stream re-sends the time whenever W says it lost it.
+    """
     import serial                                   # pyserial; imported here so replay works without it
-    return serial.Serial(port, BAUD, timeout=1)
+    ser = serial.Serial()
+    ser.port, ser.baudrate, ser.timeout = port, BAUD, 1     # baud is ignored on the S3's native USB
+    ser.dtr = False
+    ser.rts = False
+    ser.open()
+    return ser
 
 
-def serial_stream(ser):
-    """Yield packets from the live watchtower, forever. Junk lines are skipped."""
+def serial_stream(ser, on_event=None):
+    """Yield packets from the live watchtower, forever.
+
+    The watchtower prints two kinds of line (PROTOCOL.md 10.1 D3):
+      frame lines (one per packet heard)    -> yielded as packet dicts
+      event lines {"ev": ...}               -> passed to on_event(event), e.g. block_sent / errors
+    The laptop is the mesh's clock source: we send set_time on connect and again whenever W
+    reports clock_not_set (it lost its clock in a reset). Without it W sends no TIME beacons and
+    refuses BLOCKs. Frame lines from before the clock is set are dropped by parse_line.
+    """
+    last_sync = 0.0
+
+    def sync_clock():
+        nonlocal last_sync
+        if time.time() - last_sync > 2:             # W nags every 5 s: don't answer the same nag twice
+            ser.write(encode_cmd(make_set_time_cmd(time.time())))
+            last_sync = time.time()
+
+    sync_clock()                                    # start the mesh clock right away
     while True:
         line = ser.readline()                       # waits up to timeout=1 s for a full line
         if not line:
             continue                                # timeout, nothing heard: keep waiting
+        event = parse_event(line)
+        if event is not None:
+            if needs_clock(event):
+                sync_clock()
+            if on_event:
+                on_event(event)
+            continue
         pkt = parse_line(line)
         if pkt is not None:
-            # The ESP32 has no real-time clock (its t is likely "seconds since boot"),
-            # so stamp the laptop's real time on arrival.
-            pkt["rx_t"] = time.time()
+            pkt["rx_t"] = time.time()               # laptop arrival time (for display)
             yield pkt
 
 

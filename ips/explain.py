@@ -49,6 +49,7 @@ EVIDENCE = {
     "dup_tx_count": ("its own messages repeated/s",  "{:.0f}",   "up"),
     "rssi_dev_max": ("signal jump from its usual level", "{:.0f} dB", "up"),
     "mac_count":    ("radio addresses using its identity", "{:.0f}", "up"),
+    "id_mismatch":  ("packets whose address didn't match their identity", "{:.0f}", "up"),
 }
 
 

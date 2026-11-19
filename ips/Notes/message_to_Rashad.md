@@ -1,9 +1,7 @@
-Hey Rashad, for the IPS I need:
+Hey Rashad, thanks for the sim, its watchtower logs parse straight into the IPS (0 false alarms on 2,641 windows). What I still need:
 
-1. You and Jose to agree on the packet types: DATA/ACK/HELLO/BLOCK (routing.h) vs DATA/HELLO/CTRL/KEYS (Jose's design). The IPS accepts both for now
-2. The default TTL (still TBD in PROTOCOL.md §12)
-3. Sim logs of normal traffic (chat, relays, ACKs) in the watchtower format, with `pseudo` = transmitter
-4. An "unplug B" recording labelled normal, since it's on camera and must not get flagged
-5. How fast nodes reroute after a BLOCK, for the video
+1. The hardware default TTL (still TBD in PROTOCOL.md §12)
+2. Real hardware recordings: 5 minutes of normal traffic with X powered off, plus an "unplug B" run (or tell me if Yunus is recording these)
+3. Nice to have: sim runs on our 4-board layout (A–B, B–C, A–D, D–C) with bursty chat. A fast back-and-forth chat briefly looks like a slow flood to the IPS
 
-Optional: node drop reasons (BAD_LINK_TAG, BLOCKED...) in the log. Thanks!
+Thanks!

@@ -1,6 +1,8 @@
-Hey Jose, thanks for the notes, I've implemented them: tracking by `node`, your block format, the O9 rule (no auto-block of a whole node on spoof-like evidence), and `ips/datasets/` is ready. Yes please to `id_ok`. What I still need:
+Hey Jose, done on my side: IPS normal training with X powered off, spoof detection (signal jump + `id_ok` + MAC count, alert only), missing-KEYS alert (your 10e), and the O9 policy. What I still need:
 
-1. Task 11 attack specs (rates/timings, loud + quiet versions), especially the real routing attack (forged hop)
-2. Labelled recordings for Wednesday in `ips/datasets/`. I proposed a labels format in `ips/datasets/README.md`, one line per run: `{"label":"flood","node":"X","start":...,"end":...}`. Does that work for your scripts?
-3. Replay and spoof runnable on X
-4. A question: a replayer sends frames with many different stolen pseudonyms, so a (pseudo AND mac) block barely stops it. Could a block for a `"?"` radio match on MAC only (pseudo = wildcard)?
+1. Labelled attack recordings, even short ones (~2 min per attack) with a `.labels.jsonl`, in `ips/datasets/`. They're the only way to get real numbers for the video
+2. A yes/no on the labels format in `ips/datasets/README.md`: one line per run, `{"label":"flood","node":"X","start":...,"end":...}`
+3. Task 11 specs, especially the real routing attack (forged hop), so my training data matches
+4. A question: a replayer uses many stolen pseudonyms, so a (pseudo AND mac) block barely stops it. Could a block for a `"?"` radio match on MAC only (pseudo = wildcard)?
+
+Thanks!

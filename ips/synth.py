@@ -87,6 +87,10 @@ def new_msg_id():
 def make_packet(t, node, ptype, ttl, hop, msg_id, label="normal", pseudo=None, mac=None, node_tag=None):
     """One watchtower log line. pseudo/mac/node_tag override the honest values (used by replays)."""
     real_pseudo, real_mac = identity(node, t)
+    tag = node_tag or node
+    # The watchtower's id_ok check: does the MAC on air match the MAC derived for the node whose
+    # pseudonym this is? False for "?" frames and for a spoofer using its own MAC.
+    id_ok = tag != "?" and (mac or real_mac) == identity(tag, t)[1]
     return {
         "t": round(t, 3),
         "mac": mac or real_mac,              # rotates every minute...
@@ -99,6 +103,7 @@ def make_packet(t, node, ptype, ttl, hop, msg_id, label="normal", pseudo=None, m
         "rssi": round(RSSI[node] + random.gauss(0, 2)),
         "len": 240,
         "link_ok": True,
+        "id_ok": id_ok,
         "label": label,
     }
 

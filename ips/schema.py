@@ -39,7 +39,10 @@ PACKET_TYPES = {"DATA", "HELLO", "CTRL", "KEYS"}
 #       secrets. "A"-"D" = our nodes, "X" = attacker board, "W" = watchtower itself,
 #       "?" = a pseudonym that matches no real node (an outsider, or a forged identity).
 #       Unlike mac/pseudo it does NOT rotate, so the IPS can follow a node across rotations.
-OPTIONAL_TYPES = {"node": str}
+# id_ok: the watchtower checked that the frame's MAC is the one derived from the same secret as its
+#        pseudonym (False for "?" and for a radio using someone's pseudonym from its own MAC).
+OPTIONAL_TYPES = {"node": str, "id_ok": bool}
+MIN_MESH_TIME = 1e9      # before W's clock is set, its `t` is seconds since boot (< 1e9): drop those lines
 NODE_IDS = {"A", "B", "C", "D", "W", "X"}
 UNKNOWN_NODE = "?"
 WATCHTOWER = "W"
@@ -80,10 +83,14 @@ def parse_line(line):
 
     if pkt["type"] not in PACKET_TYPES:
         return None
+    if pkt["t"] < MIN_MESH_TIME:
+        return None                                   # W's clock isn't set yet: t is boot time (PROTOCOL 10.1 D5)
     for name, cast in OPTIONAL_TYPES.items():         # optional: keep if present and valid
         if raw.get(name) is not None:
+            value = raw[name]
             try:
-                pkt[name] = cast(raw[name])
+                pkt[name] = (value.lower() == "true" if cast is bool and isinstance(value, str)
+                             else cast(value))
             except (TypeError, ValueError):
                 pass                                  # a bad optional field doesn't sink the packet
     if LABEL_FIELD in raw:                            # keep ground truth when it exists
@@ -117,6 +124,32 @@ def make_unblock_cmd(node, pseudo="", mac="", pair_only=False):
     PROVISIONAL: Jose proposes unblocking by a `block_id` the watchtower echoes back; the exact
     format is Yunus's call (PROTOCOL.md serial section). Until then we name the same target."""
     return {"cmd": "unblock", **_target(node, pseudo, mac, pair_only)}
+
+
+def make_set_time_cmd(unix_s):
+    """Start (or restart) the watchtower's mesh clock. W beacons this time to every node, and
+    BLOCKs fail with clock_not_set until it has one (PROTOCOL.md 10.4)."""
+    return {"cmd": "set_time", "unix_ms": int(unix_s * 1000)}
+
+
+def parse_event(line):
+    """A watchtower EVENT line ({"ev": ...}: block_sent, warning, error, clock_set, ...) -> dict,
+    or None if the line is a frame line, junk, or not JSON. (PROTOCOL.md 10.1 D3)"""
+    if isinstance(line, bytes):
+        line = line.decode("utf-8", errors="replace")
+    line = line.strip()
+    if not line.startswith("{"):
+        return None
+    try:
+        raw = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    return raw if isinstance(raw, dict) and "ev" in raw else None
+
+
+def needs_clock(event):
+    """True if W is telling us its clock is lost (after a reset): re-send set_time."""
+    return event.get("ev") in ("warning", "error") and event.get("reason") == "clock_not_set"
 
 
 def encode_cmd(cmd):

@@ -57,6 +57,9 @@ WINDOWS_LOG = "data/live_windows.jsonl"
 EVENTS_LOG = "data/live_events.jsonl"
 EXPLAIN_LOG = "data/live_explanations.jsonl"   # LLM summaries, written a few seconds after each event
 STATUS_PATH = "data/live_status.json"          # replay or watchtower, speed, start time (for the dashboard)
+WATCHTOWER_LOG = "data/watchtower_events.jsonl"  # what W says back: clock_set, block_sent, errors, ...
+# W events worth printing (the rest, like per-epoch status, only go to the log file)
+SHOW_EVENTS = {"boot", "clock_set", "block_queued", "block_sent", "unblock_sent", "warning", "error"}
 COMMANDS_LOG = "data/operator_commands.jsonl"  # Block / Unblock / Confirm / Dismiss clicks from the dashboard
 MODE_PATH = "data/ips_mode.json"               # {"auto_block": true/false}, set by the dashboard switch
 PRUNE_EVERY_S = 600                            # check the 6-hour log limit every 10 minutes
@@ -352,6 +355,15 @@ def auto_block_enabled():
         return True
 
 
+def watchtower_event(ev):
+    """A line W printed about itself (not a packet). Logged with the laptop time; key ones printed,
+    so you can see a BLOCK actually went out (block_sent) or why it didn't (error ...)."""
+    log_line(WATCHTOWER_LOG, {"rx_t": round(time.time(), 3), **ev})
+    if ev.get("ev") in SHOW_EVENTS:
+        details = ", ".join(f"{k}={v}" for k, v in ev.items() if k not in ("ev", "fp"))
+        print(f"  [watchtower] {ev['ev']}  {details}")
+
+
 def log_line(path, obj):
     """Append one JSON line to a log file (the dashboard reads these)."""
     with open(path, "a") as f:
@@ -382,7 +394,7 @@ def main():
 
     # Start each run with empty logs so the dashboard shows only this run
     os.makedirs("data", exist_ok=True)
-    for path in (WINDOWS_LOG, EVENTS_LOG, EXPLAIN_LOG, COMMANDS_LOG):
+    for path in (WINDOWS_LOG, EVENTS_LOG, EXPLAIN_LOG, COMMANDS_LOG, WATCHTOWER_LOG):
         open(path, "w").close()
 
     # Tell the dashboard where the data comes from (shown as LIVE or "5x replay")
@@ -392,7 +404,7 @@ def main():
 
     if args.port:
         ser = open_serial(args.port)
-        source = serial_stream(ser)
+        source = serial_stream(ser, on_event=watchtower_event)
         send_cmd = lambda cmd: ser.write(encode_cmd(cmd))        # real BLOCK to the watchtower
     else:
         source = replay(args.file or "test_session.jsonl", speed=args.speed)

@@ -108,6 +108,9 @@ def build_features(df):
     # whatever the network's default TTL is; DATA legitimately carries up to the default (16 in
     # Rashad's sim), which would hide a fake TTL of 10 inside ttl_max.
     df["hello_ttl"] = df["ttl"].where(df["type"] == "HELLO", 0)
+    # Watchtower's MAC-vs-pseudonym check. Older logs and Rashad's sim don't have it: count as OK.
+    df["id_bad"] = ~(df["id_ok"].fillna(True).astype(bool) if "id_ok" in df.columns
+                     else pd.Series(True, index=df.index))
 
     aggs = dict(
         pkt_count = ("t", "size"), #Packets this second
@@ -124,6 +127,7 @@ def build_features(df):
         dup_tx_count = ("same_tx_repeat", "sum"),                   # msg_ids it had already sent before
         rssi_dev_max = ("rssi_dev", "max"),                         # biggest jump from its usual signal (dB)
         mac_count = ("mac", "nunique"),                             # MACs using this identity this second
+        id_mismatch = ("id_bad", "sum"),                            # packets whose MAC doesn't fit their pseudonym
         # Not features (the model never sees them): the identity seen on air right now,
         # needed to block an unknown radio by its exact (pseudo, mac) pair.
         mac = ("mac", "last"),
@@ -134,7 +138,7 @@ def build_features(df):
         aggs["label"] = ("label", lambda s: s[s != "normal"].iloc[0] if (s != "normal").any() else "normal")
 
     feats = df.groupby(["node", "window"]).agg(**aggs).reset_index() #turns node/window back into normal columns
-    for col in ("orig_count", "dup_tx_count", "mac_count"):
+    for col in ("orig_count", "dup_tx_count", "mac_count", "id_mismatch"):
         feats[col] = feats[col].astype(int)
 
     #std of 1 packet is undefined (NaN), so treat it as "no wobble"

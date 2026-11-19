@@ -27,7 +27,8 @@ FEATURES = ["pkt_count", "hello_count", "rssi_mean", "rssi_std",
             "stale_count",    # msg_ids first heard > 60 s ago: replay
             "dup_tx_count",   # msg_ids it had already sent: replay
             "rssi_dev_max",   # jump from this identity's usual signal: spoof (a second radio)
-            "mac_count"]      # MACs behind one identity in one second: spoof without a copied MAC
+            "mac_count",      # MACs behind one identity in one second: spoof without a copied MAC
+            "id_mismatch"]    # watchtower's id_ok = false: MAC doesn't belong to the pseudonym (spoof, replay)
 
 RF_PATH = "models/rf.joblib"            # where the trained Random Forest is saved for live.py
 IF_PATH = "models/iforest.joblib"       # trained Isolation Forest (for the rule-vs-AI comparison)
