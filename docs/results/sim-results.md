@@ -1,10 +1,10 @@
-# Simulation results (v1 flooding)
+# Simulation results (v1 flooding & v2 route learning)
 
 _Owner: Rashad_
 
-These are the results from the Python sim running the real `routing.c` (the same code that goes on the boards). Everything here comes from commit `5eebe0f`. Metric definitions are in `PROTOCOL.md` §13.
+These are the results from the Python sim running the real `routing.c` (the same code that goes on the boards). Everything here comes from commit `5eebe0f`, except `v2_compare` (§7), which comes from `22e7a57` (same routing code, it only added the experiment). Metric definitions are in `PROTOCOL.md` §13.
 
-All 30 plots are in [`figures/`](figures/). The ones that matter most are shown in each section below.
+All 35 plots are in [`figures/`](figures/). The ones that matter most are shown in each section below.
 
 ## How the sim works
 
@@ -60,7 +60,7 @@ Does flooding stay reliable as the mesh grows, and what does it cost?
 
 ![Transmissions per delivered message vs mesh size](figures/scaling_tx_per_delivered.png)
 
-This shows that flooding is reliable at every size (≥ 0.994), but the cost grows with the mesh: about **1.8 transmissions per node** for every message delivered. That's roughly one network-wide flood for the DATA and another for the ACK, minus what k-suppression saves. This is the baseline route learning (v2) has to beat, since a learned route should cost about "path length × 2" and stay flat as the mesh grows. Median latency goes up with size too, which makes sense since paths get longer.
+This shows that flooding is reliable at every size (≥ 0.994), but the cost grows with the mesh: about **1.8 transmissions per node** for every message delivered. That's roughly one network-wide flood for the DATA and another for the ACK, minus what k-suppression saves. This is the baseline route learning (v2) was meant to beat. §7 tests it; TTL scoping cuts the cost but doesn’t make it flat. Median latency goes up with size too, which makes sense since paths get longer.
 
 ---
 
@@ -141,7 +141,34 @@ How much of the jitter window should be random versus based on RSSI? (See `PROTO
 This shows that more randomness keeps nodes with similar signal strength from transmitting at the same moment. Going from 12% to 50% cuts collisions by 43% with the same delivery, for about 33 ms more median latency. Collisions matter more to us, so the default is now **50%**. The 20 ms random part is still 2–3 frame airtimes even at 300 kbps, so the §5.3 timing rule still holds on slow channels. This sweep only ran at 1000 kbps though.
 
 ---
+## 7. Route learning (v2): Tradeoffs
 
+If nodes learned how far away each peer is and scoped the TTL to that, how much would it save? Was turning it off for privacy worth it?
+
+**Background:** 
+- v2 setup: A node learns a peer's distance from the hop count on frames it decrypts, then sends with TTL = distance + 1 margin instead of a full flood. A retry forgets the route and floods.
+
+- Reasoning for it being off: A scoped TTL tells anyone listening roughly how far away the recipient is (`PROTOCOL.md` §6, decided with Jose)
+
+**Setup:** `v2_compare`, 20 / 30 / 40 / 50 nodes, route learning off vs. on, with 2 kinds of traffic:
+- Random pairs (conversations=None in the plots): A new sender and recipient for every message. Only the ACK gets scoped, since the pair rarely talks again.
+
+- 5 conversations: 5 fixed pairs talking both ways, like a real chat. Both DATA and ACK get scoped, so this is close to the most v2 could save.
+
+| Nodes | Random Pairs | 5 Conversations |
+|---|---|---|
+| 20 | 36.3 → 31.9 (−12%) | 36.0 → 29.1 (−19%) |
+| 30 | 51.8 → 46.9 (−9%)  | 52.1 → 36.5 (−30%) |
+| 40 | 72.3 → 60.7 (−16%) | 71.6 → 53.3 (−26%) |
+| 50 | 88.9 → 79.1 (−11%) | 90.7 → 64.9 (−28%) |
+
+![Comparing Tx per Delivered](figures/v2_compare_tx_per_delivered.png)
+
+This shows that route learning does save transmissions, just not as much as I expected. With random pairs it saves about 10–15%, since only the ACK gets scoped. With conversations it saves about 20–30%, since both directions get scoped. Collisions drop too: at 50 nodes they go from 2,768 → 2,561 with random pairs and from 2,895 → 2,175 with conversations. But the cost still grows with the mesh. Even with conversations, it roughly doubles from 20 to 50 nodes (29 → 65). That’s because scoping is still flooding, just inside a radius, and a 4–5 hop radius covers a lot of a 50-node mesh. Only real unicast routing would stay flat as the mesh grows, so the “path length × 2” guess from §2 was too optimistic.
+
+Delivery doesn’t change (0.990–0.999 everywhere), so the +1 margin doesn’t lose messages. The slowest messages do get a bit slower, though: p95 latency is higher with v2 in 7 of 8 settings (808 → 1,205 ms at 20 nodes with conversations). When a learned route goes stale, the first attempt doesn’t make it, and only the flooding retry gets through. The savings with conversations also vary a lot (±17 at 50 nodes), depending on whether the 5 pairs happen to be close together or far apart. Overall, keeping v1 costs about **10–30% more transmissions** and **doesn’t change delivery**, and in return a frame’s TTL **never** gives away how far away the recipient is. For a mesh that’s supposed to hide who’s talking to who, this is a good tradeoff, so **v1 is the better option** here. 
+
+---
 ## Limitations
 
 - **Crypto is a stand-in.** The sim doesn't model encryption time or KEYS / CTRL traffic, so real meshes will carry a bit of extra background traffic.
@@ -156,4 +183,4 @@ This shows that more randomness keeps nodes with similar signal strength from tr
 
 ## All figures
 
-Every experiment has five plots in [`figures/`](figures/): `<experiment>_delivery_ratio.png`, `_tx_per_delivered.png`, `_latency_ms_median.png`, `_latency_ms_p95.png`, and `_collisions.png`, for `scaling`, `capacity`, `burstiness`, `k_sweep`, `jitter_sweep`, and `ttl_sweep`.
+Every experiment has five plots in [`figures/`](figures/): `<experiment>_delivery_ratio.png`, `_tx_per_delivered.png`, `_latency_ms_median.png`, `_latency_ms_p95.png`, and `_collisions.png`, for `scaling`, `capacity`, `burstiness`, `k_sweep`, `jitter_sweep`, `ttl_sweep`, and `v2_compare`. In the `v2_compare` plots, `conversations=None` means random pairs.

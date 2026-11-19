@@ -49,8 +49,8 @@ All boards run the same firmware; the role (`NODE`, `WATCHTOWER`, `ATTACKER`) is
 | Radio | ESP-NOW (connectionless Wi-Fi frames, 250-byte max payload) |
 | Firmware | C/C++ on ESP32-S3, FreeRTOS tasks _(Arduino-ESP32 vs. ESP-IDF: TBD)_ |
 | Crypto | X25519 + XChaCha20-Poly1305, Ed25519-signed BLOCKs _(Monocypher or libsodium: TBD)_ |
-| Routing | Managed flooding → reverse-path route learning with flood fallback |
-| Simulation | Python discrete-event sim (`networkx`), 20–50 nodes |
+| Routing | Managed flooding |
+| Simulation | Python discrete-event sim running the real `routing.c` (via `ctypes`), 20–50 nodes |
 | IPS | Python: Isolation Forest + Random Forest, rule-based baseline, Streamlit dashboard |
 | Analysis | `.pcap` export + Wireshark Lua dissector |
 
@@ -121,7 +121,7 @@ python tools/chat_client.py --port /dev/ttyUSB0   # TBD
 | Encrypt + decrypt time on ESP32-S3 | < 5 ms | _TBD_ |
 | Detection time per attack (ML) | ≤ 5 s | _TBD_ |
 | IPS recall / FPR (ML vs. rules) | ML ≥ rules | _TBD_ |
-| Sim: transmissions per delivered msg, flooding vs. route learning (50 nodes) | Route learning lower | _TBD_ |
+| Sim: transmissions per delivered msg, flooding vs. route learning (50 nodes) | Route learning lower | Lower, but not deployed: 88.9 → 79.1 with random pairs (−11%), 90.7 → 64.9 with 5 conversations (−28%). See [sim results §7](docs/results/sim-results.md) |
 
 ## Known limitations
 
