@@ -398,7 +398,7 @@ event text in `firmware/src/node/gm_node.c` and `firmware/src/watchtower/gm_watc
 | # | Rule |
 |---|---|
 | D1 | USB serial (the S3's native USB; the baud setting is ignored). **One JSON object per line**, UTF-8, `\n`-terminated, ≤ 1 KB. Lines that don't start with `{` are debug output: ignore them. |
-| D2 | **Open the port with DTR and RTS low.** pyserial's default open toggles them, which reboots an ESP32-S3 and wipes the watchtower's clock: `s = serial.Serial(); s.port = P; s.dtr = False; s.rts = False; s.open()`. |
+| D2 | **Opening (or closing) the port can reset the board**, which wipes the watchtower's clock. Open with DTR and RTS low (`s = serial.Serial(); s.port = P; s.dtr = False; s.rts = False; s.open()`), but on Windows the driver may still reset it (Nov 18). So: **a host talking to W re-sends `set_time` whenever W reports `warning clock_not_set`**, and keeps one session open where it can. |
 | D3 | Three kinds of line: **commands** (laptop → board) have `"cmd"`; **events** (board → laptop) have `"ev"`; **watchtower frame lines** have neither and follow §11 / `ips/schema.py`. |
 | D4 | Boards are named by **letter** on serial: `"A"`–`"D"` nodes, `"W"` watchtower, `"X"` attacker. Numeric ids appear only inside frames. |
 | D5 | Watchtower frame lines carry `t` = **mesh clock**, unix seconds with ms precision. Before W's clock is set, `t` is local boot time (`t < 1e9`) and `node` is `"?"`: drop those lines. Laptop tools stamp their own arrival time (the IPS adds `rx_t`). |
