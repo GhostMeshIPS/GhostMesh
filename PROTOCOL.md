@@ -194,7 +194,9 @@ Normal (non-drop) events: `RT_LOG_RELAY_SCHEDULED`, `RT_LOG_TX`, `RT_LOG_DELIVER
 
 _Owner: Rashad_
 
-Code: `routing.c` (`route_learn`, `build_and_send`, `retry_fire`, `neighbor_seen`, `hello_fire`). v2 is **off by default** (`route_learning = 0`), so the boards run plain v1 flooding unless it's turned on.
+> **Not deployed (Nov 19).** Jose and I decided to put privacy ahead of scalability here: TTL scoping leaks roughly how far the recipient is (§6.7), so it stays off (`route_learning = 0`, the default) on every board. The code stays only so the sim can measure what scoping would have saved, which is the privacy-vs-efficiency tradeoff we wanted to measure. The neighbor table (§6.5) is passive and doesn't send anything, so it's not affected.
+
+Code: `routing.c` (`route_learn`, `build_and_send`, `retry_fire`, `neighbor_seen`, `hello_fire`). v2 is **off by default** (`route_learning = 0`), so the boards run plain v1 flooding.
 
 ### 6.1 Why not next-hop forwarding
 
@@ -534,7 +536,7 @@ _Owner: Rashad + Jose_
 | Relay jitter window | TBD | Planned 10–50 ms. Must be at least 2–3× the airtime of k frames |
 | Suppression threshold k | 2 | From the sim's `k_sweep` (50 nodes, 300 and 1000 kbps, commit `72c8408`): k = 1 loses messages to coverage holes; k = 3 cuts tail latency but costs more transmissions and collisions. See `docs/results/sim-results.md` |
 | Frame airtime | TBD | Estimated ~3 ms per 240-byte frame at 1 Mbps; measure on hardware later |
-| Route learning (v2) | Off | `route_learning`. On = scoped sends (§6). Off on the boards for now |
+| Route learning (v2) | Off | `route_learning`. Not for deployment: scoping leaks recipient distance (§6). Sim only, to measure the tradeoff |
 | Scope margin | 1 hop | Added to the learned distance (§6.3) |
 | Route expiry | 30 s | Learned distance forgotten if not confirmed (§6.2) |
 | HELLO interval | Off | Optional (§6.5). Neighbors are learned from traffic anyway; HELLO costs airtime |
