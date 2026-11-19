@@ -755,6 +755,8 @@ static rt_peer_t *peer_find(rt_node_t *n, uint32_t peer_id)
 // one has expired, so a route that got longer still corrects itself within route_expiry_ms
 static void route_learn(rt_node_t *n, uint32_t peer_id, uint8_t hops)
 {
+    // v1 never touches the peer table here, so a v1 node's peer LRU stays exactly as before v2
+    if(!n->cfg.route_learning) return;
     rt_peer_t *p = peer_get(n, peer_id);
     if(!p) return;
     uint32_t now = n->p->now_ms(n->ctx);
