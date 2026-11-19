@@ -105,8 +105,8 @@ def build_features(df):
     # Per node, not per MAC: with MACs rotating, a per-MAC gap would restart every minute.
     df["gap"] = df.groupby("node")["t"].diff()
     # TTL on HELLOs only (0 for other packets). Honest HELLOs are one-hop and always carry TTL 1,
-    # whatever the network's default TTL is; DATA legitimately carries up to the default (16 in
-    # Rashad's sim), which would hide a fake TTL of 10 inside ttl_max.
+    # whatever the network's default TTL is; DATA legitimately carries up to the default (5 on the
+    # boards, 16 in Rashad's sim), which could hide a fake TTL inside ttl_max.
     df["hello_ttl"] = df["ttl"].where(df["type"] == "HELLO", 0)
     # Watchtower's MAC-vs-pseudonym check. Older logs and Rashad's sim don't have it: count as OK.
     df["id_bad"] = ~(df["id_ok"].fillna(True).astype(bool) if "id_ok" in df.columns

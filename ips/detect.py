@@ -34,6 +34,10 @@ RF_PATH = "models/rf.joblib"            # where the trained Random Forest is sav
 IF_PATH = "models/iforest.joblib"       # trained Isolation Forest (for the rule-vs-AI comparison)
 BENCH_PATH = "models/benchmark.json"    # test-session scores of all 3 detectors (for the dashboard)
 
+# Real hardware recordings with NO attacks in them (git-ignored, ask the team for copies).
+# Nov 18 smoke test: A, B, C + W, ~18 min, X never powered on. Missing files are skipped.
+REAL_NORMAL_LOGS = ["data/raw/smoke_nov18.jsonl"]
+
 
 def rule_detect(feats):
     """Flag every window that breaks either threshold (too many packets OR too many HELLOs).
@@ -120,7 +124,16 @@ def flagged_table(feats, pred_col, who):
 if __name__ == "__main__":
     # --- Train the Isolation Forest ONCE, on clean normal traffic only ---
     # Training doesn't depend on which attack file we test, so it stays outside the loop.
+    # Fake normal + real normal: fake-only flagged 17% of real traffic (real boards differ from
+    # our simulation in small ways), real-only would make the fake benchmark below unfair.
+    real_logs = [p for p in REAL_NORMAL_LOGS if os.path.exists(p)]
+    real = (pd.concat([build_features(read_file(p)) for p in real_logs], ignore_index=True)
+            if real_logs else None)
     train_feats = build_features(read_file("normal_session1.jsonl"))
+    if real is not None:
+        train_feats = pd.concat([train_feats, real], ignore_index=True)
+    print(f"Isolation Forest trains on {len(train_feats)} normal windows "
+          f"({len(real) if real is not None else 0} of them from real hardware)")
     model = train_iforest(train_feats)
 
     # --- Test both detectors on each attack session (data the model has never seen) ---
@@ -190,3 +203,14 @@ if __name__ == "__main__":
         for who, flagged in [(RULE_NAME, rule_detect(sim)), ("Isolation Forest", iforest_detect(model, sim)),
                              ("Random Forest", rf_detect(rf, sim) != "normal")]:
             print(f"{who[:8]:<8} false alarms {flagged.mean():.1%}  ({int(flagged.sum())} windows)")
+
+    # --- False-alarm check on REAL hardware traffic (no attacks, so every flag is a false alarm) ---
+    # The Random Forest never saw this data, so its number is a fair test. The Isolation Forest
+    # trained on it, so its number only shows it has learned what the real boards look like.
+    if real is not None:
+        print(f"\n=== False alarms on real hardware ({', '.join(real_logs)}: {len(real)} windows, all normal) ===")
+        for who, flagged in [(RULE_NAME, rule_detect(real)),
+                             ("Isolation Forest (trained on this data)", iforest_detect(model, real)),
+                             ("Random Forest", rf_detect(rf, real) != "normal")]:
+            print(f"{who[:8]:<8} false alarms {flagged.mean():.1%}  ({int(flagged.sum())} windows)"
+                  + ("   <- trained on this data" if "trained" in who else ""))

@@ -29,7 +29,7 @@ START_T = 1731264000.0   # fake Unix timestamp for t=0 (a whole minute, like a r
 EPOCH = 60               # every node changes pseudonym AND MAC on each Unix minute boundary
 ROTATION_GAP = 0.3       # seconds of silence after each boundary (changing MAC restarts Wi-Fi)
 
-DEFAULT_TTL = 16         # Rashad's sim value (PROTOCOL.md 12, includes +2 for hop padding); hardware still TBD
+DEFAULT_TTL = 5          # hardware value (Yunus, Nov 19): 3 real hops + 2 for hop padding
 HELLO_PERIOD = 2.0       # HELLO beacons ~every 2 s (0.5 Hz), never relayed
 JITTER = 0.2             # +/- wobble on each HELLO interval
 KEYS_PERIOD = 10.0       # each node floods its next-epoch key ~6 times a minute

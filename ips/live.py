@@ -50,7 +50,10 @@ RSSI_HISTORY_MIN = 10     # need at least this many normal windows before trusti
 # of a jammer that reacts to frame type. A BLOCK can't stop a jammer, so this is an ALERT only.
 # A simple rule, not ML: there's no attacker transmitting anything to learn from.
 KEYS_WINDOW_S = 60        # look back this far
-KEYS_MIN = 2              # fewer KEYS than this in KEYS_WINDOW_S from an active node -> alert
+KEYS_MIN = 1              # fewer KEYS than this in KEYS_WINDOW_S from an active node -> alert
+                          # (= alert only at ZERO: on the real boards (Nov 18 smoke log) a healthy node
+                          #  starts ~4 KEYS/min and W sometimes credits a relay's copy, so 1 in 60 s
+                          #  happens normally; 0 never did. Jamming removes ALL of a node's KEYS.)
 ACTIVE_GAP_S = 10         # silent longer than this = the node was off; its "active for a minute" clock restarts
 
 WINDOWS_LOG = "data/live_windows.jsonl"
@@ -141,7 +144,7 @@ class LiveIPS:
             if active and len(seen) < KEYS_MIN and node not in self.keys_alerted:
                 self.keys_alerted.add(node)
                 self.event(now, "ALERT", node, "keys_missing",
-                           f"only {len(seen)} key update(s) in the last {KEYS_WINDOW_S} s (expected ~6) while it "
+                           f"only {len(seen)} key update(s) in the last {KEYS_WINDOW_S} s (expected ~4) while it "
                            f"is still transmitting: possible jamming aimed at its KEYS frames")
             elif len(seen) >= KEYS_MIN:
                 self.keys_alerted.discard(node)
