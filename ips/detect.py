@@ -34,9 +34,9 @@ RF_PATH = "models/rf.joblib"            # where the trained Random Forest is sav
 IF_PATH = "models/iforest.joblib"       # trained Isolation Forest (for the rule-vs-AI comparison)
 BENCH_PATH = "models/benchmark.json"    # test-session scores of all 3 detectors (for the dashboard)
 
-# Real hardware recordings with NO attacks in them (git-ignored, ask the team for copies).
+# Real hardware recordings with NO attacks in them (in git, see datasets/README.md).
 # Nov 18 smoke test: A, B, C + W, ~18 min, X never powered on. Missing files are skipped.
-REAL_NORMAL_LOGS = ["data/raw/smoke_nov18.jsonl"]
+REAL_NORMAL_LOGS = ["datasets/2026-11-18_normal_01.jsonl"]
 
 
 def rule_detect(feats):

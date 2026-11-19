@@ -12,7 +12,7 @@ What it models (numbers from PROTOCOL.md and Jose's security/notes-for-hannan.md
   * KEYS frames from every node about every 10 s; a signed CTRL time beacon from W every 10 s.
   * Every node swaps MAC + pseudonym on each Unix minute, with a short outage (~0.3 s).
   * Relays accept at most ~20 new msg_ids per second from one transmitter (flood hardening).
-Attacks: flood (any rate), routing abuse (fast HELLOs with a fake TTL), replay (X re-sends frames
+Attacks: flood (any rate), routing abuse (HELLOs with a fake TTL; the boards send none), replay (X re-sends frames
 it overheard 2+ minutes earlier). Harmless event that must NOT be flagged: node B unplugged.
 
 Relayed copies of an attacker's frames are labelled "normal": the relay isn't attacking, and
@@ -30,7 +30,9 @@ EPOCH = 60               # every node changes pseudonym AND MAC on each Unix min
 ROTATION_GAP = 0.3       # seconds of silence after each boundary (changing MAC restarts Wi-Fi)
 
 DEFAULT_TTL = 5          # hardware value (Yunus, Nov 19): 3 real hops + 2 for hop padding
-HELLO_PERIOD = 2.0       # HELLO beacons ~every 2 s (0.5 Hz), never relayed
+HELLO_ENABLED = False    # honest HELLOs are OFF on the real boards (hello_interval_ms = 0, Yunus, Nov 19),
+                         # so normal traffic has none and ANY HELLO is suspicious (see routing_attack)
+HELLO_PERIOD = 2.0       # if turned on: HELLO beacons ~every 2 s (0.5 Hz), never relayed
 JITTER = 0.2             # +/- wobble on each HELLO interval
 KEYS_PERIOD = 10.0       # each node floods its next-epoch key ~6 times a minute
 BEACON_PERIOD = 10.0     # watchtower's signed TIME beacon
@@ -57,7 +59,7 @@ CONVERSATIONS = [("A", "C"), ("B", "D")]     # who chats with whom (A-C must go 
 ATTACKER = "X"           # the attacker board: a keyed insider that behaves normally between attacks
 FLOOD_RATE = 30          # packets per second (a normal node originates well under 1/s)
 SLOW_FLOOD_RATE = 8      # under the rule's threshold of 15
-ROUTING_RATE = 5         # fake HELLOs per second (normal: 0.5/s)
+ROUTING_RATE = 5         # fake HELLOs per second (normal: none, HELLOs are off on the boards)
 ROUTING_FAKE_TTL = 10    # honest HELLOs use TTL 1
 REPLAY_RATE = 2          # replayed frames per second
 REPLAY_AGE = (120, 170)  # replayed frames were captured this many seconds earlier
@@ -179,7 +181,7 @@ class Mesh:
         end = START_T + self.duration
         for node in NODES + [ATTACKER]:
             t = START_T + random.uniform(0, HELLO_PERIOD)           # HELLO: one hop, not relayed
-            while t < end:
+            while HELLO_ENABLED and t < end:
                 if not self.is_down(node, t) and not in_rotation_gap(t):
                     self.packets.append(make_packet(t, node, "HELLO", 1, 0, new_msg_id()))
                 t += HELLO_PERIOD + random.uniform(-JITTER, JITTER)
