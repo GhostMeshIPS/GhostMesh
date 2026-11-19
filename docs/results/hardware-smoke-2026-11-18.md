@@ -4,8 +4,8 @@ Owner: Yunus (Comp E). Firmware: `firmware-node-integration` after merging `main
 eviction + jitter 50%) and the `RT_LOG_PEER_EVICTED` fix. Goal: confirm this exact code on hardware
 before merging the PR.
 
-**Result: the core works on hardware; two bugs found (§3). The PR is held until they're fixed and a short
-re-test passes (Thu Nov 19).**
+**Result: the core works on hardware; two bugs found (§3). The PR was merged with these as known issues;
+fixes and a short re-test follow in a separate PR (Thu Nov 19).**
 
 ## 1. Setup
 
@@ -69,5 +69,5 @@ run** (it did on Nov 17). Nodes were unaffected and kept running on their own cl
 1. Fix 3.1 (node layer + test) and 3.2 (chat client).
 2. Reflash A–D; 5-minute re-test including `/block C` across an epoch change; check the log for any
    non-locally-administered MAC.
-3. Merge the PR if clean.
+3. Merge the fix PR if clean.
 4. Then: debug D, the A ↔ B delivery rate, the 3-board allowlist test (G1/G2).
