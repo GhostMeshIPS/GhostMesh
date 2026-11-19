@@ -25,7 +25,8 @@ node sent an automatic test message every 20 s (`/auto`): A→C, B→D, C→A, D
 
 | Measurement | Value | Notes |
 |---|---|---|
-| **Airtime per 240-byte frame** | **3279 µs** (time from `esp_now_send` to the send-done callback) | Includes channel access (DIFS + backoff) and callback delay. Pure on-air time works out to ~2.46 ms (283 B incl. 802.11 + ESP-NOW headers at 1 Mbps + 192 µs preamble). Your ~3 ms estimate holds, so the 10–50 ms jitter window with k = 2–3 is fine |
+| **Send-to-callback per 240-byte frame** | **3279 µs, measured** (time from `esp_now_send` to the send-done callback; `airtime_avg_us` in `/status`) | This is what the board can measure. Includes channel access (DIFS + backoff) and driver/callback delay on top of the on-air time. Nov 18 smoke: 3151–3199 µs. Sets the per-board send ceiling (~305 frames/s) |
+| **Pure on-air time** | **~2.46 ms, calculated (not measured)** | Derived, not timed: 283 B (240 payload + 802.11 + ESP-NOW headers) at the **measured** 1 Mbps (8 µs/B = 2264 µs) + 192 µs preamble. The board has no second radio to time a frame on the air; only the rate (below) is measured, and at a fixed rate + fixed size the on-air time is fixed. To measure it directly would need a sniffer/SDR with µs timestamps. Your ~3 ms estimate holds, so the 10–50 ms jitter window with k = 2–3 is fine |
 | **PHY rate** | **1 Mbps, every frame** (`rate 0`, `sig_mode 0` on all 2504 logged frames) | ESP-NOW doesn't adapt its rate: weak links lose frames, they don't slow down |
 | Max frames/s per transmitter | ~305 (1 / 3.28 ms) | Rough mesh ceiling with flooding: ~305 / (2·N) messages/s, ≈ 38/s at N = 4, about half that with collisions. Worth confirming with the attacker flood |
 | **k-suppression on hardware** | Run 1, per board after ~10 min: `relayed` 150–200, `dup` ~240, **`cancelled` 15–33** | Relays are being cancelled after k copies |

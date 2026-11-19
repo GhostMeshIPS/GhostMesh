@@ -63,7 +63,16 @@ static void air_send(int from, const uint8_t *mac, const uint8_t frame[240])
     a->at = T + 3;                            /* ~airtime */
 }
 
-static void hw_transmit(void *ctx, const uint8_t f[240]) { simnode_t *s = ctx; air_send(s->idx, s->mac, f); }
+static bool g_factory_mac_on_air;   /* set if any node ever transmits under a non-rotated (factory) MAC */
+static void hw_transmit(void *ctx, const uint8_t f[240])
+{
+    simnode_t *s = ctx;
+    /* A rotated epoch MAC is locally administered (bit 0x02 of octet 0); a real Espressif factory
+     * MAC is globally administered (bit clear). A node must never put a frame on the air under a
+     * factory MAC: that defeats rotation and links the board across epochs (first-sync race). */
+    if (s->idx < MAXN && !(s->mac[0] & 0x02)) g_factory_mac_on_air = true;
+    air_send(s->idx, s->mac, f);
+}
 static uint64_t hw_local_ms(void *ctx) { return T - ((simnode_t *)ctx)->boot_at; }
 static void hw_rng(void *ctx, uint8_t *out, size_t n)
 {
@@ -116,6 +125,7 @@ static void sim_reset(void)
     memset(N, 0, sizeof N);
     memset(LINK, 0, sizeof LINK);
     NN = 0; NAIR = 0; NEV = 0; T = 0; W_ON = false;
+    g_factory_mac_on_air = false;
 }
 
 static simnode_t *add_node(const gm_node_keys_t *k, uint64_t boot_at, uint64_t seed)
@@ -125,7 +135,9 @@ static simnode_t *add_node(const gm_node_keys_t *k, uint64_t boot_at, uint64_t s
     s->boot_at = boot_at;
     s->rng = seed;
     s->alive = true;
-    uint8_t m[6] = {0x02, 0, 0, 0, 0, (uint8_t)k->name};
+    /* Boot under a factory-style (globally administered) MAC, like a real board before it rotates,
+     * so any pre-rotation transmit is caught by hw_transmit's factory-MAC check. */
+    uint8_t m[6] = {0x3c, 0x0f, 0x02, 0xe3, 0xbb, (uint8_t)k->name};
     memcpy(s->mac, m, 6);
     gm_hw_t hw = { s, hw_transmit, hw_local_ms, hw_rng, hw_emit, hw_set_mac, NULL, NULL };
     T = boot_at;
@@ -197,6 +209,13 @@ static void test_two_boards_debug_clock(void)
     CHECK(count_ev('*', "bad_link_tag") == 0, "no link_tag failures (same network key)");
     CHECK(count_ev('*', "\"ev\":\"epoch\"") >= 8, "both boards rotated pseudonym/MAC each epoch");
     CHECK(count_ev('*', "no_beacon") == 2, "no_beacon alert (expected: no watchtower in this test)");
+
+    /* crypto benchmark command: runs and reports on a synced node with a peer (µs numbers are only
+     * meaningful on hardware; the host's virtual clock doesn't tick inside the loop). */
+    gm_node_bench(&a->node, 50);
+    CHECK(count_ev('A', "\"ev\":\"bench\"") == 1, "bench ran and reported");
+    CHECK(count_ev('A', "\"reason\":\"not_ready\"") == 0 && count_ev('A', "\"reason\":\"no_peer\"") == 0,
+          "bench found the node ready with a peer");
 }
 
 static void test_line_with_watchtower(void)
@@ -226,6 +245,36 @@ static void test_line_with_watchtower(void)
           "10 round trips over 2 minutes of epoch changes");
     CHECK(count_ev('*', "\"ev\":\"failed\"") == 0, "no failed sends");
     CHECK(count_ev('*', "no_beacon") == 0, "no missing-beacon alerts");
+}
+
+/* Regression for the Nov 18 first-sync race (hardware-smoke-2026-11-18.md §3.1): when a node takes
+ * its first beacon, its clock syncs immediately but the radio MAC used to switch only on the next
+ * ~100 ms tick, so a frame relayed in that window went out under the board's factory MAC. Here W
+ * reaches only A, so sync spreads hop by hop (A, then B, then C), and cross traffic runs the whole
+ * time, maximising the chance a node relays something right after syncing. No node may ever
+ * transmit under its factory MAC. */
+static void test_first_sync_no_factory_mac(void)
+{
+    printf("Test 2b: first-sync MAC race - no factory MAC ever reaches the air\n");
+    sim_reset();
+    simnode_t *a = add_node(keys_A(), 0, 4001);
+    simnode_t *b = add_node(keys_B(), 250, 4002);
+    simnode_t *c = add_node(keys_C(), 500, 4003);
+    link_(0, 1); link_(1, 2);
+    run(1000);
+    start_watchtower(false);
+    LINK[MAXN][0] = LINK[0][MAXN] = true;    /* W -> A only: B and C sync from relayed beacons */
+
+    /* keep DATA moving while sync spreads, so a node may need to relay just after it syncs */
+    for (int i = 0; i < 12; i++) {
+        gm_node_send(&a->node, 'C', "x", 1);
+        gm_node_send(&c->node, 'A', "y", 1);
+        run(5000);
+    }
+    CHECK(a->node.c.synced && b->node.c.synced && c->node.c.synced, "all three nodes synced");
+    CHECK(count_ev('*', "\"ev\":\"synced\"") == 3, "each node emitted synced exactly once");
+    CHECK(count_ev('*', "\"ev\":\"epoch\"") > 0, "MAC/pseudonym rotated (boot MAC was replaced)");
+    CHECK(!g_factory_mac_on_air, "no node ever transmitted under its factory MAC");
 }
 
 static void test_watchtower_log_and_block(void)
@@ -317,6 +366,7 @@ int main(int argc, char **argv)
     PRINT = argc > 1 && !strcmp(argv[1], "-v");
     test_two_boards_debug_clock();
     test_line_with_watchtower();
+    test_first_sync_no_factory_mac();
     test_outsider();
     test_watchtower_log_and_block();
     test_block_two_hops_after_beacon();

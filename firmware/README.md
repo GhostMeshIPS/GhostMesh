@@ -124,7 +124,7 @@ Full list in `PROTOCOL.md` §10. The common ones:
 
 | Board | Command |
 |---|---|
-| node | `{"cmd":"send","to":"B","text":"hi"}` (≤ 152 bytes), `status`, `auto` (`to`, `every_s`, 0 = off), `verbose`, `txpower` (`qdbm` 8–84), `rssi_gate` (`dbm`, −127 = off), `allow` (`macs`, rotation off only), `rotate_mac` (`on`, then reboot), `wipe_state`, `reboot`, `set_time` (**bench only**) |
+| node | `{"cmd":"send","to":"B","text":"hi"}` (≤ 152 bytes), `status`, `auto` (`to`, `every_s`, 0 = off), `verbose`, `txpower` (`qdbm` 8–84), `rssi_gate` (`dbm`, −127 = off), `allow` (`macs`, rotation off only), `rotate_mac` (`on`, then reboot), `bench` (`runs`, 0 = default 2000; times encrypt + trial-decrypt, prints `{"ev":"bench",...}` with `enc_us`/`dec_us`), `wipe_state`, `reboot`, `set_time` (**bench only**) |
 | W | `set_time` (`unix_ms`), `status`, `block` (`node` or `?` + `pseudo` + `mac`, `reason`, `until` in unix s), `unblock`, `txpower`, `reboot` |
 
 ## 6. Tests (no hardware)
@@ -155,14 +155,15 @@ Measurements: `docs/results/hardware-bench-2026-11-17.md`.
 
 ## 8. Known issues
 
-- **First-beacon bug (routing):** `rt_on_receive` checks the epoch window before CTRL, so an unsynced
-  node drops TIME beacons. `gm_node_rx` works around it, but the first beacon isn't relayed, so sync
-  spreads one hop per 10 s. Fix belongs in `routing.c`.
-- **Factory-MAC leak at first sync:** frames relayed in the ~100 ms after a node takes its first beacon go
-  out under its real hardware MAC and an old pseudonym (`docs/results/hardware-smoke-2026-11-18.md` §3.1).
-  Fix planned: switch epoch + MAC before returning to routing.
-- **Opening a serial port resets the board on Windows**, which wipes W's clock, even when opened with
-  DTR/RTS low. Until the fix (the client re-sends `set_time` when W reports `clock_not_set`), keep **one** W
-  session open, or type `/time` after reopening. `ips/ingest.py` has the same problem.
+- ~~**First-beacon bug (routing):**~~ Fixed in `routing.c` (Rashad): an unsynced node now takes the first
+  signed TIME beacon (epoch check skipped for TIME only) and syncs; it still doesn't relay that beacon
+  under its old identity. The `gm_node_rx` workaround has been removed.
+- ~~**Factory-MAC leak at first sync:**~~ Fixed. The clock syncs in rx but the epoch chain + rotated MAC
+  are only set on the next `gm_tick`, so routing now gates relaying on `node_ready` (synced **and**
+  `have_chain`), and `gm_node_rx` forces that tick onto the next poll. Nothing is relayed under the factory
+  MAC. Regression test: `test_first_sync_no_factory_mac` in `firmware/test/node/test_node.c`.
+- ~~**Opening a serial port resets the board on Windows**~~ (W loses its clock): `tools/chat_client.py` now
+  re-sends `set_time` whenever W reports `clock_not_set` (same as `ips/ingest.py`), so W recovers on its own.
+  `/time` still forces a manual re-send.
 - Board D isn't working (to debug).
 - Frames that W hears before its clock is set carry local time and `node: "?"`. Drop `t < 1e9` from logs.

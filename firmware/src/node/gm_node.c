@@ -150,7 +150,15 @@ static uint32_t p_random_u32(void *ctx)
     return v;
 }
 
-static bool p_is_synced(void *ctx) { return ((gm_node_t *)ctx)->c.synced; }
+/* "Ready to originate or relay": the clock is synced AND gm_tick has initialised the epoch chain
+ * (have_chain). gm_clock_on_beacon sets c.synced synchronously when the first beacon arrives, but
+ * cur_epoch, have_chain and the rotated MAC are only set on the next gm_tick (in gm_node_poll).
+ * Gating on have_chain keeps routing from relaying in that gap, which is where a frame would
+ * otherwise go out under the board's factory MAC and stale pseudonym (first-sync race,
+ * docs/results/hardware-smoke-2026-11-18.md §3.1). gm_node_rx forces the tick to run on the very
+ * next poll after a syncing beacon, so the gap is one poll, not a 100 ms tick period. */
+static bool node_ready(const gm_node_t *n) { return n->c.synced && n->c.have_chain; }
+static bool p_is_synced(void *ctx) { return node_ready((const gm_node_t *)ctx); }
 
 static bool p_link_tag_ok(void *ctx, const rt_frame_t *f)
 {
@@ -438,17 +446,16 @@ void gm_node_rx(gm_node_t *n, const uint8_t frame[240], const uint8_t mac[6], in
 
     memcpy(n->cur_rx_mac, mac, 6);
 
-    /* WORKAROUND (tell Rashad): rt_on_receive checks the ±1 epoch window before it looks at CTRL,
-     * and an unsynced node's epoch is 0, so the very first TIME beacon is always dropped as
-     * bad_epoch and nothing ever syncs. Until routing exempts CTRL from the epoch check while
-     * unsynced, take the first beacon here. Safe: link_tag + Ed25519 signature + "newer than last"
-     * still apply. Not relayed (we weren't synced); the next beacon is relayed normally. */
-    if (!n->c.synced && f.ver_type == RT_FRAME_CTRL && f.ciphertext[0] == GM_CTRL_TIME
-        && gm_link_tag_ok(n->c.network_key, &f)) {
-        if (p_ctrl_verify(n, &f)) emit(n, "{\"ev\":\"first_beacon\"}");
-        return;
-    }
+    bool was_synced = n->c.synced;
     rt_on_receive(&n->rt, &f, mac, rssi);
+
+    /* routing.c (Rashad's first-beacon fix) now takes the first signed TIME beacon while unsynced
+     * and syncs the clock (c.synced flips here), but it does not relay that beacon under the board's
+     * old identity. gm_tick still has to run to initialise the epoch chain and switch the MAC, and
+     * node_ready() / p_is_synced keeps routing from relaying anything until it has. Force that tick
+     * onto the very next poll instead of waiting up to a full tick period, so the board becomes
+     * relay-ready in one poll and never transmits under its factory MAC (first-sync race §3.1). */
+    if (!was_synced && n->c.synced) n->next_tick_local = 0;
 }
 
 static bool try_send_now(gm_node_t *n, char to, const uint8_t *text, uint8_t len)
@@ -466,8 +473,8 @@ static bool try_send_now(gm_node_t *n, char to, const uint8_t *text, uint8_t len
 bool gm_node_send(gm_node_t *n, char to, const char *text, size_t len)
 {
     if (len > RT_BODY_MAX) { emit(n, "{\"ev\":\"error\",\"reason\":\"too_long\"}"); return false; }
-    if (n->c.synced && try_send_now(n, to, (const uint8_t *)text, (uint8_t)len)) return true;
-    if (n->c.synced) { emit(n, "{\"ev\":\"error\",\"reason\":\"busy\"}"); return false; }
+    if (node_ready(n) && try_send_now(n, to, (const uint8_t *)text, (uint8_t)len)) return true;
+    if (node_ready(n)) { emit(n, "{\"ev\":\"error\",\"reason\":\"busy\"}"); return false; }
     if (n->sendq_n >= GM_NODE_SENDQ) { emit(n, "{\"ev\":\"error\",\"reason\":\"queue_full\"}"); return false; }
     n->sendq[n->sendq_n].to = to;
     n->sendq[n->sendq_n].len = (uint8_t)len;
@@ -481,7 +488,7 @@ bool gm_node_send(gm_node_t *n, char to, const char *text, size_t len)
 
 static void flush_sendq(gm_node_t *n)
 {
-    while (n->sendq_n && n->c.synced) {
+    while (n->sendq_n && node_ready(n)) {
         if (!try_send_now(n, n->sendq[0].to, n->sendq[0].text, n->sendq[0].len)) return;   /* busy: later */
         memmove(&n->sendq[0], &n->sendq[1], sizeof n->sendq[0] * (size_t)(n->sendq_n - 1));
         n->sendq_n--;
@@ -599,5 +606,56 @@ void gm_node_boot_banner(gm_node_t *n, const char *fw_version)
              "{\"ev\":\"boot\",\"name\":\"%c\",\"id\":%lu,\"fw\":\"%s\",\"peers\":%d,"
              "\"fp\":{\"self\":\"%s\",\"network\":\"%s\",\"watchtower\":\"%s\"}}",
              n->keys.name, (unsigned long)n->keys.node_id, fw_version, n->keys.peer_count, self, net, wt);
+    emit(n, buf);
+}
+
+void gm_node_bench(gm_node_t *n, uint32_t runs)
+{
+    if (!node_ready(n)) { emit(n, "{\"ev\":\"error\",\"reason\":\"not_ready\"}"); return; }
+
+    int pi = -1;
+    for (int i = 0; i < GM_MAX_PEERS; i++)
+        if (n->c.peers[i].used) { pi = i; break; }
+    if (pi < 0) { emit(n, "{\"ev\":\"error\",\"reason\":\"no_peer\"}"); return; }
+
+    if (runs == 0) runs = 2000;
+    if (runs > 50000) runs = 50000;             /* keep the processing task well under the watchdog */
+
+    rt_inner_t in;
+    memset(&in, 0, sizeof in);
+    in.sender_id    = n->keys.node_id;
+    in.recipient_id = n->c.peers[pi].node_id;
+    in.timestamp    = (uint32_t)gm_node_mesh_ms(n);
+    in.type         = RT_TYPE_DATA;
+    in.len          = 16;
+    memset(in.body, 0x5a, in.len);
+
+    /* encrypt: fill the AEAD-authenticated cleartext header once (gm_encrypt makes its own nonce). */
+    rt_frame_t f;
+    memset(&f, 0, sizeof f);
+    f.ver_type = RT_FRAME_DATA;
+    f.flags = 0;
+    n->hw.rng(n->hw.ctx, f.msg_id, 8);
+    gm_put_be16(f.epoch, gm_node_wire_epoch(n));
+
+    uint64_t t0 = local_ms(n);
+    for (uint32_t i = 0; i < runs; i++) gm_encrypt(&n->c, &in, &f);
+    uint64_t enc_ms = local_ms(n) - t0;         /* f now holds a valid frame addressed to the peer */
+
+    /* decrypt: trial-decrypt that frame. The pair key (me,peer) is symmetric, so the AEAD open
+     * succeeds; the recipient_id != me check then rejects it. Either way this times a full
+     * per-message decrypt attempt, the cost every relayed frame pays. */
+    rt_inner_t out;
+    uint64_t t1 = local_ms(n);
+    for (uint32_t i = 0; i < runs; i++) gm_try_decrypt(&n->c, &f, &out);
+    uint64_t dec_ms = local_ms(n) - t1;
+
+    char buf[192];
+    snprintf(buf, sizeof buf,
+             "{\"ev\":\"bench\",\"runs\":%lu,\"peer\":\"%c\",\"enc_ms\":%lu,\"dec_ms\":%lu,"
+             "\"enc_us\":%lu,\"dec_us\":%lu}",
+             (unsigned long)runs, gm_node_peer_name(n, n->c.peers[pi].node_id),
+             (unsigned long)enc_ms, (unsigned long)dec_ms,
+             (unsigned long)(enc_ms * 1000u / runs), (unsigned long)(dec_ms * 1000u / runs));
     emit(n, buf);
 }
