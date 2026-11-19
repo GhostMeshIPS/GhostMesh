@@ -226,24 +226,39 @@ static void apply_block(gm_node_t *n, uint64_t issued, const uint8_t *p)
     emit(n, buf);
 }
 
-/* Per-transmitter 1 verify / 5 s (decision 10b) and ~2 verifies / s overall (8d). */
+/* CTRL verify budget (decisions 8d, 10b). Only FAILED verifies count (Jose, Nov 17): counting every
+ * frame made a node 2 hops from W drop a fresh BLOCK whenever a TIME beacon had come through the
+ * same neighbour in the last 5 s. A transmitter that failed in the last 5 s is skipped, and the
+ * mesh as a whole is skipped after 2 failures in the last second. Valid CTRL from W never costs budget. */
+static gm_ctrl_track_t *ctrl_track(gm_node_t *n, const rt_frame_t *f, bool create)
+{
+    gm_ctrl_track_t *oldest = &n->ctrl_track[0];
+    for (int i = 0; i < GM_NODE_CTRL_TRACK; i++) {
+        gm_ctrl_track_t *c = &n->ctrl_track[i];
+        if (c->used && !memcmp(c->pseudo, f->src_pseudo, 4) && !memcmp(c->mac, n->cur_rx_mac, 6)) return c;
+        if (!c->used || c->last_ms < oldest->last_ms) oldest = c;
+    }
+    if (!create) return NULL;
+    oldest->used = true;
+    memcpy(oldest->pseudo, f->src_pseudo, 4);
+    memcpy(oldest->mac, n->cur_rx_mac, 6);
+    return oldest;
+}
+
 static bool ctrl_budget_ok(gm_node_t *n, const rt_frame_t *f)
 {
     uint64_t now = local_ms(n);
-    if (n->ctrl_budget_ms[0] && now - n->ctrl_budget_ms[0] < 1000) return false;   /* 2 in the last second */
+    if (n->ctrl_budget_ms[0] && now - n->ctrl_budget_ms[0] < 1000) return false;   /* 2 failures in the last second */
+    gm_ctrl_track_t *t = ctrl_track(n, f, false);
+    return !(t && t->last_ms && now - t->last_ms < 5000);
+}
 
-    gm_ctrl_track_t *t = NULL, *oldest = &n->ctrl_track[0];
-    for (int i = 0; i < GM_NODE_CTRL_TRACK; i++) {
-        gm_ctrl_track_t *c = &n->ctrl_track[i];
-        if (c->used && !memcmp(c->pseudo, f->src_pseudo, 4) && !memcmp(c->mac, n->cur_rx_mac, 6)) { t = c; break; }
-        if (!c->used || c->last_ms < oldest->last_ms) oldest = c;
-    }
-    if (t && now - t->last_ms < 5000) return false;
-    if (!t) { t = oldest; t->used = true; memcpy(t->pseudo, f->src_pseudo, 4); memcpy(t->mac, n->cur_rx_mac, 6); }
-    t->last_ms = now;
+static void ctrl_note_failure(gm_node_t *n, const rt_frame_t *f)
+{
+    uint64_t now = local_ms(n);
+    ctrl_track(n, f, true)->last_ms = now;
     n->ctrl_budget_ms[0] = n->ctrl_budget_ms[1];
     n->ctrl_budget_ms[1] = now;
-    return true;
 }
 
 /* Returns true only if the CTRL frame verified and was applied, so routing relays it. */
@@ -265,7 +280,7 @@ static bool p_ctrl_verify(void *ctx, const rt_frame_t *f)
     if (!ctrl_budget_ok(n, f)) return false;
 
     uint8_t sub; uint64_t issued; const uint8_t *payload; size_t plen;
-    if (!gm_ctrl_verify(&n->c, region, &sub, &issued, &payload, &plen)) return false;
+    if (!gm_ctrl_verify(&n->c, region, &sub, &issued, &payload, &plen)) { ctrl_note_failure(n, f); return false; }
 
     if (sub == GM_CTRL_TIME) {
         if (!gm_clock_on_beacon(&n->c, issued, local_ms(n))) return false;

@@ -44,7 +44,11 @@ static void draw(const gm_display_snap_t &s)
         snprintf(l[4], 32, "dup %lu gate %lu allow %lu", (unsigned long)s.dup, (unsigned long)s.gate, (unsigned long)s.allow);
     snprintf(l[5], 32, "%s", s.last_msg[0] ? s.last_msg : "<no messages yet");
     snprintf(l[6], 32, "%s", s.last_send[0] ? s.last_send : ">nothing sent");
-    snprintf(l[7], 32, "q%u  macgap %lums", s.queued, (unsigned long)(s.mac_outage_us / 1000));
+    if (s.auto_every_s)
+        snprintf(l[7], 32, "auto>%c/%us ok%lu x%lu", s.auto_to, s.auto_every_s, (unsigned long)s.ok, (unsigned long)s.failed);
+    else
+        snprintf(l[7], 32, "q%u ok%lu x%lu gap%lums", s.queued, (unsigned long)s.ok, (unsigned long)s.failed,
+                 (unsigned long)(s.mac_outage_us / 1000));
 
     s_oled.clearBuffer();
     s_oled.setFont(u8g2_font_5x8_tf);       // 25 chars x 8 lines

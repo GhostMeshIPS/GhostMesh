@@ -17,6 +17,9 @@ extern "C" const gm_node_keys_t *gm_board_keys(void);   // node/board_keys.c
 static gm_node_t s_node;                // ~50 KB: static, never on a stack
 static QueueHandle_t s_rx_q, s_cmd_q;
 static Preferences s_prefs;
+static char s_auto_to;              // hands-free test traffic: send to this node...
+static uint16_t s_auto_every_s;     // ...every N seconds once synced (0 = off). Saved in flash.
+static uint32_t s_auto_n, s_next_auto;
 
 // ---- gm_hw_t: what gm_node needs from the hardware -------------------------
 static void hw_transmit(void *, const uint8_t f[240]) { radio_send(f); }
@@ -57,6 +60,10 @@ static void publish_display()
         s.heard_n++;
         if (h.rssi > s.heard_best) s.heard_best = h.rssi;
     }
+    s.auto_to = s_auto_to;
+    s.auto_every_s = s_auto_every_s;
+    s.ok = L[RT_LOG_ACK_MATCHED];
+    s.failed = L[RT_LOG_SEND_FAILED];
     strlcpy(s.last_msg, n->st.last_msg, sizeof s.last_msg);
     strlcpy(s.last_send, n->st.last_send, sizeof s.last_send);
     display_publish(s);
@@ -65,13 +72,14 @@ static void publish_display()
 // ---- commands ------------------------------------------------------------------
 static void emit_radio_status()
 {
-    char buf[200];
+    char buf[260];
     snprintf(buf, sizeof buf,
              "{\"ev\":\"radio\",\"airtime_avg_us\":%lu,\"rx_overflow\":%lu,\"tx_fail\":%lu,\"free_heap\":%lu,"
-             "\"rotate_mac\":%s,\"rssi_gate\":%d,\"allow_n\":%u}",
+             "\"rotate_mac\":%s,\"rssi_gate\":%d,\"allow_n\":%u,\"auto_to\":\"%c\",\"auto_every_s\":%u}",
              (unsigned long)radio_airtime_avg_us(), (unsigned long)radio_rx_overflows(),
              (unsigned long)radio_tx_failures(), (unsigned long)ESP.getFreeHeap(),
-             s_node.rotate_mac ? "true" : "false", s_node.rssi_gate, s_node.allow_n);
+             s_node.rotate_mac ? "true" : "false", s_node.rssi_gate, s_node.allow_n,
+             s_auto_to ? s_auto_to : '-', s_auto_every_s);
     serial_emit(buf);
 }
 
@@ -112,6 +120,18 @@ static void on_command(const gm_cmd_t &c)
         ESP.restart();
         break;
     case CMD_REBOOT:    ESP.restart(); break;
+    case CMD_AUTO: {
+        s_auto_to = c.to;
+        s_auto_every_s = (uint16_t)constrain(c.value, 0, 3600);
+        if (!s_auto_to) s_auto_every_s = 0;
+        s_prefs.putChar("auto_to", s_auto_to);
+        s_prefs.putUShort("auto_s", s_auto_every_s);
+        s_next_auto = millis() + 3000;
+        char buf[80];
+        snprintf(buf, sizeof buf, "{\"ev\":\"auto\",\"to\":\"%c\",\"every_s\":%u}", s_auto_to ? s_auto_to : '-', s_auto_every_s);
+        serial_emit(buf);
+        break;
+    }
     }
 }
 
@@ -129,12 +149,19 @@ static void proc_task(void *)
         while (xQueueReceive(s_cmd_q, &c, 0) == pdTRUE) on_command(c);
         gm_node_poll(&s_node);
         led_service();
+        if (s_auto_every_s && s_node.c.synced && (int32_t)(millis() - s_next_auto) >= 0) {
+            s_next_auto = millis() + s_auto_every_s * 1000u;
+            char text[40];
+            int len = snprintf(text, sizeof text, "auto %c#%lu", s_node.keys.name, (unsigned long)++s_auto_n);
+            gm_node_send(&s_node, s_auto_to, text, (size_t)len);
+        }
         if ((int32_t)(millis() - next_display) >= 0) { next_display = millis() + 250; publish_display(); }
     }
 }
 
 void setup()
 {
+    Serial.setTxBufferSize(2048);                       // whole JSON lines fit (status is ~600 bytes)
     Serial.begin(115200);
     delay(300);                                         // let USB CDC enumerate
     led_init();
@@ -154,6 +181,9 @@ void setup()
                  state_len == GM_STATE_BYTES ? state_len : 0);
     s_node.rotate_mac = s_prefs.getBool("rotmac", true);
     s_node.rssi_gate = s_prefs.getChar("rssi_gate", -127);
+    s_auto_to = (char)s_prefs.getChar("auto_to", 0);
+    s_auto_every_s = s_prefs.getUShort("auto_s", 0);
+    s_next_auto = millis() + 5000;
 
     gm_node_boot_banner(&s_node, GM_FW_VERSION);
     emit_radio_status();

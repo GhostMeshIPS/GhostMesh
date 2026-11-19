@@ -33,6 +33,10 @@ static void on_recv(const esp_now_recv_info_t *info, const uint8_t *data, int le
     memcpy(it.frame, data, 240);
     memcpy(it.mac, info->src_addr, 6);
     it.rssi = (int8_t)info->rx_ctrl->rssi;
+    it.rx_us = info->rx_ctrl->timestamp;           // radio's own µs clock (watchtower log: rx_us)
+    it.rate = info->rx_ctrl->rate;
+    it.sig_mode = info->rx_ctrl->sig_mode;
+    it.mcs = info->rx_ctrl->mcs;
     if (xQueueSend(s_rx_q, &it, 0) != pdTRUE) s_rx_overflow++;
 }
 

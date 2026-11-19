@@ -15,12 +15,14 @@ struct gm_rx_item_t {
     uint8_t frame[240];
     int8_t  rssi;
     uint8_t mac[6];
+    uint32_t rx_us;                    // radio timestamp (µs)
+    uint8_t rate, sig_mode, mcs;       // PHY info for the watchtower log
 };
 
 // Commands parsed from serial (loop task), executed on the processing task.
 enum gm_cmd_kind_t : uint8_t {
     CMD_SEND, CMD_STATUS, CMD_SET_TIME, CMD_VERBOSE, CMD_TXPOWER, CMD_RSSI_GATE,
-    CMD_ALLOW, CMD_ROTATE_MAC, CMD_WIPE_STATE, CMD_REBOOT,
+    CMD_ALLOW, CMD_ROTATE_MAC, CMD_WIPE_STATE, CMD_REBOOT, CMD_AUTO,
 };
 
 struct gm_cmd_t {
@@ -46,8 +48,11 @@ uint32_t radio_tx_failures();
 
 // serial_if.cpp
 void serial_if_init(QueueHandle_t cmd_queue);
-void serial_if_poll();                // from loop(): reads lines, queues commands
-void serial_emit(const char *json);   // thread-safe println
+void serial_if_poll();                // from loop(): reads lines, calls app_handle_line()
+void serial_emit(const char *json);   // thread-safe println; never blocks when no laptop is attached
+void serial_error(const char *why);
+QueueHandle_t serial_cmd_queue();
+void app_handle_line(const char *line);   // node_serial.cpp or watchtower/main_w.cpp
 
 // led.cpp
 void led_init();
@@ -67,6 +72,9 @@ struct gm_display_snap_t {
     int8_t   last_rssi;
     uint32_t mac_outage_us;
     uint8_t  queued;
+    char     auto_to;
+    uint16_t auto_every_s;
+    uint32_t ok, failed;
     char     last_msg[22];
     char     last_send[22];
 };

@@ -26,7 +26,7 @@ def main():
         subprocess.run([sys.executable, str(REPO / "security" / "keygen.py"), "--nodes", "A,B,C",
                         "--out", str(keys), "--roster", str(tmp / "roster.json")],
                        check=True, stdout=subprocess.DEVNULL)
-        inc = ["-I", str(FW / "src" / "node"), "-I", str(FW / "src" / "routing"),
+        inc = ["-I", str(FW / "src" / "node"), "-I", str(FW / "src" / "watchtower"), "-I", str(FW / "src" / "routing"),
                "-I", str(FW / "src" / "crypto"), "-I", str(FW / "lib" / "monocypher"), "-I", str(keys)]
         flags = ["-std=c11", "-Wall", "-Wextra", "-Werror", "-O1", "-g"]
         objs = []
@@ -36,6 +36,7 @@ def main():
                             "-c", str(FW / "src" / "node" / "board_keys.c"), "-o", str(o)], check=True)
             objs.append(str(o))
         srcs = [HERE / "test_node.c", HERE / "wt_keys.c", FW / "src" / "node" / "gm_node.c",
+                FW / "src" / "watchtower" / "gm_watch.c",
                 FW / "src" / "routing" / "routing.c", FW / "src" / "crypto" / "gm_crypto.c",
                 FW / "src" / "crypto" / "gm_ratchet.c", FW / "lib" / "monocypher" / "monocypher.c",
                 FW / "lib" / "monocypher" / "monocypher-ed25519.c"]
