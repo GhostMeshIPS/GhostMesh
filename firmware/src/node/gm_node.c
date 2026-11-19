@@ -20,14 +20,14 @@ static const char *LOG_NAMES[] = {
     "bad_link_tag", "bad_epoch", "bad_type", "blocked", "rate_limited", "duplicate",
     "dup_counted", "relay_cancelled", "ttl_expired", "ctrl_unverified", "replay_stale",
     "not_synced", "relay_scheduled", "tx", "delivered", "reack", "ack_matched",
-    "ack_unmatched", "hello", "too_long", "encrypt_failed", "send_failed",
+    "ack_unmatched", "hello", "too_long", "encrypt_failed", "send_failed", "peer_evicted",
 };
-_Static_assert(sizeof LOG_NAMES / sizeof LOG_NAMES[0] == RT_LOG_SEND_FAILED + 1,
-               "LOG_NAMES must match rt_log_t in routing.h");
+_Static_assert(sizeof LOG_NAMES / sizeof LOG_NAMES[0] == GM_NODE_LOG_LAST + 1,
+               "LOG_NAMES must match rt_log_t in routing.h (and GM_NODE_LOG_LAST in gm_node.h)");
 
 const char *gm_node_log_name(rt_log_t e)
 {
-    return (unsigned)e <= RT_LOG_SEND_FAILED ? LOG_NAMES[e] : "?";
+    return (unsigned)e <= GM_NODE_LOG_LAST ? LOG_NAMES[e] : "?";
 }
 
 /* Events that always reach the laptop; everything else only with verbose on. */
@@ -36,7 +36,7 @@ static bool log_is_important(rt_log_t e)
     switch (e) {
     case RT_LOG_BAD_LINK_TAG: case RT_LOG_BAD_EPOCH: case RT_LOG_BLOCKED:
     case RT_LOG_CTRL_UNVERIFIED: case RT_LOG_REPLAY_STALE: case RT_LOG_TOO_LONG:
-    case RT_LOG_ENCRYPT_FAILED: case RT_LOG_RATE_LIMITED:
+    case RT_LOG_ENCRYPT_FAILED: case RT_LOG_RATE_LIMITED: case RT_LOG_PEER_EVICTED:
         return true;
     default:
         return false;
@@ -333,7 +333,7 @@ static void p_notify(void *ctx, uint32_t handle, rt_status_t status)
 static void p_log(void *ctx, rt_log_t event, const rt_frame_t *f)
 {
     gm_node_t *n = ctx;
-    if ((unsigned)event <= RT_LOG_SEND_FAILED) n->st.log_counts[event]++;
+    if ((unsigned)event <= GM_NODE_LOG_LAST) n->st.log_counts[event]++;
     if (event == RT_LOG_BAD_LINK_TAG || event == RT_LOG_BLOCKED) indicate(n, GM_IND_DROP_BAD);
     if (!n->verbose && !log_is_important(event)) return;
     char id[17] = "", buf[128];

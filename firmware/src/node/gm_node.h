@@ -30,6 +30,7 @@
 #define GM_NODE_OWN_ECHO       16     /* msg_ids of KEYS frames we originated */
 #define GM_NODE_CTRL_TRACK     8      /* transmitters tracked for the CTRL verify budget */
 #define GM_NODE_ALLOW_MAX      6
+#define GM_NODE_LOG_LAST       RT_LOG_PEER_EVICTED   /* last rt_log_t value: update when routing adds one */
 
 /* What the hardware (or the sim) provides. */
 typedef struct {
@@ -76,7 +77,7 @@ typedef struct { bool used; uint8_t pseudo[4]; uint8_t mac[6]; uint64_t last_ms;
 
 /* Counters + latest values, for status and the OLED. */
 typedef struct {
-    uint32_t log_counts[RT_LOG_SEND_FAILED + 1];
+    uint32_t log_counts[GM_NODE_LOG_LAST + 1];
     uint32_t rx_frames, tx_frames, keys_sent, beacons_ok, blocks_applied;
     uint32_t gate_drops, allow_drops, own_echo_drops;
     int8_t   last_rssi;
