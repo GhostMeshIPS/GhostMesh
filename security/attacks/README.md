@@ -26,6 +26,8 @@ python security/attacks/xctl.py --port COM7 clock               # mesh time and 
 
 ## Recording a session
 
+**Step-by-step runbook for whoever records: [`RECORDING.md`](RECORDING.md).** Summary:
+
 Two laptops (or two terminals on one): the **IPS laptop** records the watchtower, the **attack laptop** runs X.
 
 1. IPS laptop: start the recording with a name that follows `ips/datasets/README.md`, e.g.
