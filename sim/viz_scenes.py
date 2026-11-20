@@ -432,3 +432,28 @@ class SelfHealClip(Clip, Scene):
         self.end_card(["Flooding keeps no routes, so there is nothing to break:",
                        "the first message after the failure already went around X",
                        "On the boards, this is the reroute-time test: unplug B, time the next message (PROTOCOL.md §13)"])
+
+
+# ---- 15 s cut for the 3-minute video: one message across 50 nodes, no captions ---------------
+
+class ScaleClip(Clip, Scene):
+    """Exactly 15 s, no captions or cards (the voiceover carries it). Replay of a 50-node scaling run."""
+
+    def construct(self):
+        d = viz_trace.get("scale50")["panels"][0]
+        m, ph = d["messages"][d["focus"]], d["phases"]
+        self.start(d["window"][0])
+        pan = Panel(d, (-1.7, -0.05), 7.6, 0.065)
+        mesh = pan.build(self.clock)
+        leg = legend({"src", "heard", "relayed", "cancelled", "delivered", "ack"}, font=18) \
+            .to_edge(RIGHT, buff=0.45).shift(DOWN * 0.4)
+        tag = Text("Simulation: 50 nodes, real routing code", font_size=20, color=SUB).to_corner(UP + LEFT, buff=0.35)
+        tmr = self.timer(lambda: m["sent"], np.array([5.0, 3.4, 0]))
+        self.play(FadeIn(mesh), FadeIn(pan.label(m["src"], "A")), FadeIn(pan.label(m["dst"], "C")),
+                  FadeIn(leg), FadeIn(tag), FadeIn(tmr), run_time=0.8)   # 0.8
+        self.wait(0.7)                                                     # 1.5
+        self.run(m["sent"], 0.2)                                           # 1.7
+        self.run(pan.tl.delivered_at + 10, 7.0)                            # 8.7  DATA floods out, C gets it
+        self.run(ph["acked"] + pan.tl.shift + 10, 4.8)                     # 13.5 ACK floods back
+        self.run(ph["end"], 0.8)                                           # 14.3
+        self.wait(0.7)                                                     # 15.0

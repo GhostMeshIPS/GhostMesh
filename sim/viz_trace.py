@@ -216,11 +216,11 @@ def focus(tr, idx):
 
 # ---- clips ------------------------------------------------------------------------
 
-def clip_flood():
-    """1. One message across a 30-node scaling run, DATA out and ACK back, nothing else on air."""
+def clip_flood(n=30, name="flood"):
+    """1. One message across an n-node scaling run, DATA out and ACK back, nothing else on air."""
     best = None
     for seed in range(10):
-        sim = replay(find_run("scaling", seed, n_nodes=30))
+        sim = replay(find_run("scaling", seed, n_nodes=n))
         msgs = sim.messages()
         for idx, m in msgs.items():
             if not (m["acked"] and len(m["attempts"]) == 1):
@@ -231,10 +231,10 @@ def clip_flood():
     _, seed, idx, sim = best
     m = sim.messages()[idx]
     tr = focus(sim.trace(m["sent"] - 20, m["span"][1] + 20), idx)
-    tr["source"] = source(sim, "scaling", seed, n_nodes=30)
-    tr["headline"] = {"delivery": mean_of("scaling", "delivery_ratio", n_nodes=30),
-                      "tx_per_delivered": mean_of("scaling", "tx_per_delivered", n_nodes=30)}
-    return {"clip": "flood", "panels": [tr]}
+    tr["source"] = source(sim, "scaling", seed, n_nodes=n)
+    tr["headline"] = {"delivery": mean_of("scaling", "delivery_ratio", n_nodes=n),
+                      "tx_per_delivered": mean_of("scaling", "tx_per_delivered", n_nodes=n)}
+    return {"clip": name, "panels": [tr]}
 
 
 def _pair_clip(experiment, setting, bad, good, base, bad_ok, prefer_hops=True):
@@ -406,7 +406,7 @@ def clip_selfheal():
     return {"clip": "selfheal", "x": x, "t_down": t_down, "panels": panels}
 
 
-CLIPS = {"flood": clip_flood, "ttl": clip_ttl, "k": clip_k, "load": clip_load, "v2": clip_v2, "selfheal": clip_selfheal}
+CLIPS = {"flood": clip_flood, "scale50": lambda: clip_flood(50, "scale50"), "ttl": clip_ttl, "k": clip_k, "load": clip_load, "v2": clip_v2, "selfheal": clip_selfheal}
 
 
 def build(name: str) -> dict:
