@@ -41,6 +41,8 @@ const char *sim_log_name(int ev)
     case RT_LOG_ENCRYPT_FAILED:  return "ENCRYPT_FAILED";
     case RT_LOG_SEND_FAILED:     return "SEND_FAILED";
     case RT_LOG_PEER_EVICTED:    return "PEER_EVICTED";
+    case RT_LOG_ROUTE_SCOPED:    return "ROUTE_SCOPED";
+    case RT_LOG_ROUTE_STALE:     return "ROUTE_STALE";
     }
     return "UNKNOWN";
 }
