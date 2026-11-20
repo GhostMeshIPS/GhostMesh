@@ -505,3 +505,18 @@ the real node keeps reading. That is the claim in the threat model (A4), demonst
 | **Refuse to overwrite without `--force`** | Overwrite silently | Re-running keygen on one laptop would quietly re-key the network and break every board already flashed |
 | **Watchtower header has no X25519 keys** | One "all keys" file | Enforces decision 1 at provisioning time: the watchtower can identify nodes but can't read messages, and the tests check this |
 
+---
+
+## 17. Packet capture: pcap exporter + Wireshark dissector
+
+**Context:** the video's "surveillance-proof" segment and the Meshtastic before/after slide need a
+sniffer's view of our traffic in a tool judges recognise. The watchtower already logs every frame's 240
+bytes (`raw`), so the capture is built from its logs rather than a second radio.
+
+| Choice | Alternatives | Why this one |
+|---|---|---|
+| **Capture header + frame** | Frame only; pcapng comments | Wireshark can then show and filter on RSSI and the watchtower's node lookup (`ghostmesh.cap.node == "X"`), which is what makes an attack visible on screen. The header is labelled as watchtower metadata, so the 240-byte frame below it stays an honest "what a sniffer sees". Comments can't be filtered or sorted |
+| **Mesh clock `t` as timestamp** | Radio `rx_us` | One clock across Wireshark, the IPS, the labels files and the video timeline (8c). `rx_us` starts at the watchtower's boot and wraps, so it's kept in the header for fine timing only |
+| **Offline + `--follow`** | Offline only | Live packets on camera without a second serial reader: the IPS keeps W's port, and the exporter tails a log file. Offline conversion covers every recorded dataset |
+| **Header + CTRL/KEYS bodies** | Header only | CTRL and KEYS are cleartext by design (8d, 6a), so decoding them shows exactly what an outsider learns (block targets, rekey cadence) and nothing more. DATA stays opaque because no keys are given to Wireshark, which is the point of the demo (N1) |
+
