@@ -520,3 +520,18 @@ bytes (`raw`), so the capture is built from its logs rather than a second radio.
 | **Offline + `--follow`** | Offline only | Live packets on camera without a second serial reader: the IPS keeps W's port, and the exporter tails a log file. Offline conversion covers every recorded dataset |
 | **Header + CTRL/KEYS bodies** | Header only | CTRL and KEYS are cleartext by design (8d, 6a), so decoding them shows exactly what an outsider learns (block targets, rekey cadence) and nothing more. DATA stays opaque because no keys are given to Wireshark, which is the point of the demo (N1) |
 
+---
+
+## 18. Attacker X: thin passthrough firmware + Python attacks
+
+**Context:** Hannan needs labelled recordings of the four attacks (and some known-issue variants) to train
+and evaluate the IPS, and the video needs a live attack. X didn't exist yet.
+
+| Choice | Alternatives | Why this one |
+|---|---|---|
+| **Passthrough firmware, attacks in Python** | Attack modes in C on X; hybrid with an on-board paced burst | Every attack is a different way of building or resending a 240-byte frame, which is quick to write and change in Python, without reflashing. The script that sends the frames also writes the labels, so ground truth is exact. Floods only need ≤ ~100 frames/s (16e), which native USB handles, so on-board pacing isn't needed yet (N6) |
+| **X holds no keys in firmware** | Compile `keys_X.h` into X | The board is only a radio; the insider's secrets stay on the laptop that runs the attack. It also keeps the transmit command, which can send anything, away from any board that holds keys |
+| **Transmit command only in the X build** | One firmware with a hidden attack mode | A raw-transmit command on a demo node would itself be an attack surface (O16 already says serial access is compromise; this keeps it from getting worse) |
+| **Jose builds X** | Yunus | Yunus is on the factory-MAC race and the serial-reset bug, which block the demo. The X build is small (reuses `radio.cpp` and the serial helper) and sits next to the attack scripts |
+| **Silent between attacks** | X as a normal node | The IPS is trained on normal traffic with X off (16f) and the runbook keeps X quiet until the attack segment; a silent sniffer matches both and needs no routing or key layer on X |
+

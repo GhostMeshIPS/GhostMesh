@@ -7,7 +7,7 @@ One build per board, because each board's secret keys are compiled in.
 |---|---|---|---|
 | A, B, C, D | `pio run -e A` … `-e D` | node: routing + crypto, relays, delivers, OLED | power bank / wall charger (or the laptop for debugging) |
 | W | `pio run -e W` | watchtower: mesh clock, signed TIME beacons, IPS log, BLOCK | plugged into the laptop |
-| X | (attacker, not built yet) | | |
+| X | `pio run -e X` | attacker passthrough (decision 18): sniffs and prints frames, sends frames the laptop gives it, sets its MAC. **No keys, never transmits on its own**; attacks run in `security/attacks/` | the attack laptop, only during attack segments |
 
 ```
 firmware/
@@ -148,7 +148,7 @@ On Windows these need gcc (MSYS2 ucrt64 or WSL).
 | Node firmware (routing + crypto, relays, ACKs, ratchet, MAC rotation, NVS state, OLED, `/auto`) | ✅ On hardware: 4 boards on a table, 3 boards untethered |
 | Watchtower (beacons, IPS log, BLOCK/unblock) | ✅ On hardware: nodes sync from W alone; BLOCK enforced |
 | Topology control (RSSI gate, MAC allowlist) | Built, not yet used on hardware |
-| Attacker (X) | Not built |
+| Attacker (X) | Written (`src/attacker/main_x.cpp`, `[env:X]`), not yet built or run on hardware |
 | Route learning (v2) | Not started |
 
 Measurements: `docs/results/hardware-bench-2026-11-17.md`.
