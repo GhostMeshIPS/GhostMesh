@@ -246,11 +246,15 @@ class _RadioBase:
         """Call fn(Heard) for every frame X hears (on the reader thread; keep it quick)."""
         self._listeners.append(fn)
 
+    def remove_listener(self, fn):
+        if fn in self._listeners:
+            self._listeners.remove(fn)
+
     def _deliver(self, h):
         t = h.frame.ctrl_time_ms()
         if t is not None:
             self.clock.on_time_beacon(t, h.laptop_ms)
-        for fn in self._listeners:
+        for fn in list(self._listeners):
             fn(h)
         try:
             self.heard.put_nowait(h)
@@ -401,6 +405,8 @@ class MockRadio(_RadioBase):
 def paced(radio, make_frame, rate_hz, duration_s, stop=None, allow_fast=False):
     """Send make_frame() every 1/rate_hz seconds for duration_s. Returns the number sent.
 
+    make_frame() may return None to skip a tick (e.g. a spoofer that hasn't re-found its victim yet).
+
     Rates above MAX_RATE_HZ (100/s, decision 16e) are refused unless allow_fast=True, because the
     watchtower's log can't carry more and the IPS would lag.
     """
@@ -410,11 +416,11 @@ def paced(radio, make_frame, rate_hz, duration_s, stop=None, allow_fast=False):
         raise ValueError(f"{rate_hz}/s is above the {MAX_RATE_HZ}/s demo cap (16e); pass allow_fast=True")
     period = 1.0 / rate_hz
     t0 = time.perf_counter()
-    n = 0
+    tick = sent = 0
     while True:
         if stop is not None and stop.is_set():
             break
-        due = t0 + n * period
+        due = t0 + tick * period
         if due - t0 >= duration_s:
             break
         wait = due - time.perf_counter()
@@ -422,9 +428,12 @@ def paced(radio, make_frame, rate_hz, duration_s, stop=None, allow_fast=False):
             time.sleep(wait - 0.001)
         while time.perf_counter() < due:
             pass
-        radio.send(make_frame())
-        n += 1
-    return n
+        tick += 1
+        frame = make_frame()
+        if frame is not None:
+            radio.send(frame)
+            sent += 1
+    return sent
 
 
 # ---- labels -----------------------------------------------------------------------------

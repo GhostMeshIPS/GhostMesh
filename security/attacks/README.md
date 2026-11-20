@@ -8,7 +8,9 @@ gives it. Everything an insider can do runs here, in Python, with X's keys from 
 |---|---|
 | `gmx.py` | Shared library: keys, crypto (same formulas as `gm_crypto`), frame build/parse, mesh clock from TIME beacons, `XRadio` (serial link to X), `MockRadio`, `paced()` sending, `LabelLog` ground truth |
 | `xctl.py` | Bring-up: `status`, `sniff`, `clock`, `set-mac`, `own-mac`. No attacks |
-| `test_gmx.py` | Tests, no hardware needed: `python security/attacks/test_gmx.py` |
+| `attacks.py` | Every attack variant in the spec table below (`ATTACKS[(label, variant)]`) |
+| `run.py` | Runs one variant (`attack`) or a whole recording session (`session`), writing the labels file |
+| `test_gmx.py`, `test_attacks.py` | Tests, no hardware needed (a simulated mesh feeds `MockRadio`) |
 
 ## First run on hardware
 
@@ -21,6 +23,27 @@ python security/attacks/xctl.py --port COM7 status
 python security/attacks/xctl.py --port COM7 sniff --secs 20     # frames + "link ok" if keys_X.h is present
 python security/attacks/xctl.py --port COM7 clock               # mesh time and epoch from W's TIME beacons
 ```
+
+## Recording a session
+
+Two laptops (or two terminals on one): the **IPS laptop** records the watchtower, the **attack laptop** runs X.
+
+1. IPS laptop: start the recording with a name that follows `ips/datasets/README.md`, e.g.
+   `python tools/chat_client.py --port <W port> --sync --log ips/datasets/2026-11-20_flood_01.jsonl`
+2. Attack laptop, same base name for the labels:
+
+```
+python security/attacks/run.py --port COM7 --labels ips/datasets/2026-11-20_flood_01.labels.jsonl session flood
+```
+
+   The session waits for a TIME beacon, then: 5 min of normal traffic (X silent), each variant for 2 min with
+   1 min of normal in between, and a last minute of normal. Stop the recording when it says it's done.
+   If both run on the same laptop that set W's clock, add `--laptop-clock`.
+3. Sessions: `flood`, `replay`, `spoof`, `routing`, `extras` (watchtower outage: follow the `>>> OPERATOR`
+   prompts), `mixed` (held-out test set). `run.py list` shows them all.
+
+One variant on its own (demo, or to retry): `run.py --port COM7 --labels <file> attack flood loud --secs 120`.
+Dry run without hardware: `run.py --mock --scale 0.05 --labels /tmp/x.labels.jsonl session flood`.
 
 ## Attack specs (decision 20)
 
@@ -45,8 +68,10 @@ sends carries a valid `link_tag`. All runs are 2 minutes unless noted.
 | routing | `hop0_ttlfix` | Same, with TTL raised so `ttl + hop = 5` | as heard | Sum check passes; only "hop went down for the same `msg_id`" catches it |
 
 **Spoof victim:** the strongest non-X transmitter (or a pseudonym the operator names at the start). After each
-rotation the script re-acquires it as the new pseudonym whose RSSI is closest to the victim's last RSSI,
-which also demonstrates O3 (RSSI tracking across rotation) on hardware.
+rotation the script waits 10 s (so every node has been heard under its new pseudonym; real nodes send only
+~0.5 frames/s), then re-acquires the victim as the new pseudonym whose RSSI is closest to its last RSSI.
+This also demonstrates O3 (RSSI tracking across rotation) on hardware. Spoofing pauses for those ~10 s
+after each rotation. `--victim <pseudonym>` names the first victim instead of the strongest neighbour.
 
 **Watchtower outage** (operator steps, during a `slow` flood): unplug W for 3 min, reboot one node while W is
 down, replug W. Expected: blocks lapse within ~2 min (16c), the IPS is blind, the rebooted node stays mute until
