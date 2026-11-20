@@ -120,6 +120,7 @@ static void on_command(const gm_cmd_t &c)
         ESP.restart();
         break;
     case CMD_REBOOT:    ESP.restart(); break;
+    case CMD_BENCH:     gm_node_bench(n, (uint32_t)c.value); break;
     case CMD_AUTO: {
         s_auto_to = c.to;
         s_auto_every_s = (uint16_t)constrain(c.value, 0, 3600);

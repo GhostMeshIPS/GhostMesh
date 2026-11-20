@@ -23,14 +23,14 @@ def main():
     tmp = Path(tempfile.mkdtemp(prefix="gm_node_test_"))
     try:
         keys = tmp / "keys"
-        subprocess.run([sys.executable, str(REPO / "security" / "keygen.py"), "--nodes", "A,B,C",
+        subprocess.run([sys.executable, str(REPO / "security" / "keygen.py"), "--nodes", "A,B,C,D,X",
                         "--out", str(keys), "--roster", str(tmp / "roster.json")],
                        check=True, stdout=subprocess.DEVNULL)
         inc = ["-I", str(FW / "src" / "node"), "-I", str(FW / "src" / "watchtower"), "-I", str(FW / "src" / "routing"),
                "-I", str(FW / "src" / "crypto"), "-I", str(FW / "lib" / "monocypher"), "-I", str(keys)]
         flags = ["-std=c11", "-Wall", "-Wextra", "-Werror", "-O1", "-g"]
         objs = []
-        for board in "ABC":
+        for board in "ABCDX":
             o = tmp / f"keys_{board}.o"
             subprocess.run([CC, *flags, *inc, f'-DGM_KEYS_FILE="keys_{board}.h"', f"-DGM_KEYS_FN=keys_{board}",
                             "-c", str(FW / "src" / "node" / "board_keys.c"), "-o", str(o)], check=True)

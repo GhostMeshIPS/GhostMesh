@@ -279,7 +279,7 @@ class XRadio(_RadioBase):
         super().__init__(clock)
         import serial                                   # pyserial, only needed for real hardware
         self.ser = serial.Serial()
-        self.ser.port, self.ser.baudrate, self.ser.timeout = port, 115200, 0.5
+        self.ser.port, self.ser.baudrate, self.ser.timeout = port, 921600, 0.5   # X is a WROOM-32E: the UART bridge needs it (80 tx/s)
         self.ser.dtr = False                            # opening with DTR/RTS toggling resets an ESP32-S3
         self.ser.rts = False
         self.ser.open()

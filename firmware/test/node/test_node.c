@@ -18,9 +18,11 @@
 const gm_node_keys_t *keys_A(void);
 const gm_node_keys_t *keys_B(void);
 const gm_node_keys_t *keys_C(void);
+const gm_node_keys_t *keys_D(void);
+const gm_node_keys_t *keys_X(void);
 const gm_watch_keys_t *keys_W(void);
 
-#define MAXN       4
+#define MAXN       6
 #define MAX_AIR    2048
 #define MAX_EVENTS 8192
 #define UNIX_BASE  1763400000000ULL     /* Nov 2025-ish, any value works */
@@ -53,8 +55,13 @@ static uint64_t  wt_rng = 0x1234567;   /* RSSI noise */
 /* ---- fake hardware ------------------------------------------------------- */
 static uint64_t xs(uint64_t *s) { uint64_t x = *s; x ^= x << 13; x ^= x >> 7; x ^= x << 17; return *s = x; }
 
+/* Demo 2: X's flood frames carry this msg_id prefix, so the test can tell when a node relays one. */
+static const uint8_t X_MARK[2] = {0xEE, 0x58};
+static int g_x_relays;          /* X frames re-sent by a real node */
+
 static void air_send(int from, const uint8_t *mac, const uint8_t frame[240])
 {
+    if (from < MAXN - 1 && !memcmp(frame + 2, X_MARK, 2)) g_x_relays++;   /* msg_id starts at byte 2 */
     if (NAIR >= MAX_AIR) { printf("  air overflow\n"); return; }
     air_t *a = &AIR[NAIR++];
     memcpy(a->frame, frame, 240);
@@ -63,7 +70,16 @@ static void air_send(int from, const uint8_t *mac, const uint8_t frame[240])
     a->at = T + 3;                            /* ~airtime */
 }
 
-static void hw_transmit(void *ctx, const uint8_t f[240]) { simnode_t *s = ctx; air_send(s->idx, s->mac, f); }
+static bool g_factory_mac_on_air;   /* set if any node ever transmits under a non-rotated (factory) MAC */
+static void hw_transmit(void *ctx, const uint8_t f[240])
+{
+    simnode_t *s = ctx;
+    /* A rotated epoch MAC is locally administered (bit 0x02 of octet 0); a real Espressif factory
+     * MAC is globally administered (bit clear). A node must never put a frame on the air under a
+     * factory MAC: that defeats rotation and links the board across epochs (first-sync race). */
+    if (s->idx < MAXN && !(s->mac[0] & 0x02)) g_factory_mac_on_air = true;
+    air_send(s->idx, s->mac, f);
+}
 static uint64_t hw_local_ms(void *ctx) { return T - ((simnode_t *)ctx)->boot_at; }
 static void hw_rng(void *ctx, uint8_t *out, size_t n)
 {
@@ -116,6 +132,8 @@ static void sim_reset(void)
     memset(N, 0, sizeof N);
     memset(LINK, 0, sizeof LINK);
     NN = 0; NAIR = 0; NEV = 0; T = 0; W_ON = false;
+    g_factory_mac_on_air = false;
+    g_x_relays = 0;
 }
 
 static simnode_t *add_node(const gm_node_keys_t *k, uint64_t boot_at, uint64_t seed)
@@ -125,7 +143,9 @@ static simnode_t *add_node(const gm_node_keys_t *k, uint64_t boot_at, uint64_t s
     s->boot_at = boot_at;
     s->rng = seed;
     s->alive = true;
-    uint8_t m[6] = {0x02, 0, 0, 0, 0, (uint8_t)k->name};
+    /* Boot under a factory-style (globally administered) MAC, like a real board before it rotates,
+     * so any pre-rotation transmit is caught by hw_transmit's factory-MAC check. */
+    uint8_t m[6] = {0x3c, 0x0f, 0x02, 0xe3, 0xbb, (uint8_t)k->name};
     memcpy(s->mac, m, 6);
     gm_hw_t hw = { s, hw_transmit, hw_local_ms, hw_rng, hw_emit, hw_set_mac, NULL, NULL };
     T = boot_at;
@@ -197,6 +217,13 @@ static void test_two_boards_debug_clock(void)
     CHECK(count_ev('*', "bad_link_tag") == 0, "no link_tag failures (same network key)");
     CHECK(count_ev('*', "\"ev\":\"epoch\"") >= 8, "both boards rotated pseudonym/MAC each epoch");
     CHECK(count_ev('*', "no_beacon") == 2, "no_beacon alert (expected: no watchtower in this test)");
+
+    /* crypto benchmark command: runs and reports on a synced node with a peer (µs numbers are only
+     * meaningful on hardware; the host's virtual clock doesn't tick inside the loop). */
+    gm_node_bench(&a->node, 50);
+    CHECK(count_ev('A', "\"ev\":\"bench\"") == 1, "bench ran and reported");
+    CHECK(count_ev('A', "\"reason\":\"not_ready\"") == 0 && count_ev('A', "\"reason\":\"no_peer\"") == 0,
+          "bench found the node ready with a peer");
 }
 
 static void test_line_with_watchtower(void)
@@ -226,6 +253,36 @@ static void test_line_with_watchtower(void)
           "10 round trips over 2 minutes of epoch changes");
     CHECK(count_ev('*', "\"ev\":\"failed\"") == 0, "no failed sends");
     CHECK(count_ev('*', "no_beacon") == 0, "no missing-beacon alerts");
+}
+
+/* Regression for the Nov 18 first-sync race (hardware-smoke-2026-11-18.md §3.1): when a node takes
+ * its first beacon, its clock syncs immediately but the radio MAC used to switch only on the next
+ * ~100 ms tick, so a frame relayed in that window went out under the board's factory MAC. Here W
+ * reaches only A, so sync spreads hop by hop (A, then B, then C), and cross traffic runs the whole
+ * time, maximising the chance a node relays something right after syncing. No node may ever
+ * transmit under its factory MAC. */
+static void test_first_sync_no_factory_mac(void)
+{
+    printf("Test 2b: first-sync MAC race - no factory MAC ever reaches the air\n");
+    sim_reset();
+    simnode_t *a = add_node(keys_A(), 0, 4001);
+    simnode_t *b = add_node(keys_B(), 250, 4002);
+    simnode_t *c = add_node(keys_C(), 500, 4003);
+    link_(0, 1); link_(1, 2);
+    run(1000);
+    start_watchtower(false);
+    LINK[MAXN][0] = LINK[0][MAXN] = true;    /* W -> A only: B and C sync from relayed beacons */
+
+    /* keep DATA moving while sync spreads, so a node may need to relay just after it syncs */
+    for (int i = 0; i < 12; i++) {
+        gm_node_send(&a->node, 'C', "x", 1);
+        gm_node_send(&c->node, 'A', "y", 1);
+        run(5000);
+    }
+    CHECK(a->node.c.synced && b->node.c.synced && c->node.c.synced, "all three nodes synced");
+    CHECK(count_ev('*', "\"ev\":\"synced\"") == 3, "each node emitted synced exactly once");
+    CHECK(count_ev('*', "\"ev\":\"epoch\"") > 0, "MAC/pseudonym rotated (boot MAC was replaced)");
+    CHECK(!g_factory_mac_on_air, "no node ever transmitted under its factory MAC");
 }
 
 static void test_watchtower_log_and_block(void)
@@ -312,14 +369,142 @@ static void test_block_two_hops_after_beacon(void)
     CHECK(count_ev('W', "block_queued") >= 1 && count_ev('W', "block_sent") >= 1, "W queued, then sent after the CTRL gap");
 }
 
+/* ---- Demo shots, checked on the laptop before filming -------------------- */
+
+/* Diamond used by both demo shots: A and C can't hear each other (shielded); B and D each reach both.
+ * W hears everyone. Index 5 is X, which is not a gm_node: it only puts frames on the air. */
+#define XIDX (MAXN - 1)
+static void build_diamond(uint64_t seed, simnode_t **a, simnode_t **b, simnode_t **c, simnode_t **d)
+{
+    sim_reset();
+    *a = add_node(keys_A(), 0, seed + 1);
+    *b = add_node(keys_B(), 150, seed + 2);
+    *c = add_node(keys_C(), 300, seed + 3);
+    *d = add_node(keys_D(), 450, seed + 4);
+    link_(0, 1); link_(1, 2);      /* A - B - C */
+    link_(0, 3); link_(3, 2);      /* A - D - C */
+    run(800);
+    start_watchtower(true);
+    run(25000);
+}
+
+static void test_demo1_multihop_unplug_b(void)
+{
+    printf("Demo 1: A -> C over the diamond, then B unplugged mid-run (self-healing)\n");
+    simnode_t *a, *b, *c, *d;
+    build_diamond(500, &a, &b, &c, &d);
+    CHECK(a->node.c.synced && b->node.c.synced && c->node.c.synced && d->node.c.synced, "all four synced from W");
+
+    gm_node_send(&a->node, 'C', "meet at 9", 9);
+    run(3000);
+    CHECK(count_ev('C', "\"from\":\"A\",\"text\":\"meet at 9\"") == 1, "C got 'meet at 9' (A can't reach C directly)");
+    CHECK(count_ev('A', "\"ev\":\"delivered\",\"to\":\"C\"") == 1, "A shows it delivered (vv)");
+
+    /* the shot: A sends once a second; B is pulled 10 s in */
+    uint32_t d_tx_before = d->node.st.log_counts[RT_LOG_TX];
+    int rx0 = count_ev('C', "\"from\":\"A\"");
+    for (int i = 0; i < 10; i++) { gm_node_send(&a->node, 'C', "tick", 4); run(1000); }
+    CHECK(d->node.st.log_counts[RT_LOG_TX] > d_tx_before, "D was already relaying before B is pulled");
+    b->alive = false;                                   /* unplug B */
+    for (int i = 0; i < 10; i++) { gm_node_send(&a->node, 'C', "tock", 4); run(1000); }
+    run(8000);                                          /* let the last ACKs and any retries land */
+    CHECK(count_ev('C', "\"from\":\"A\"") - rx0 == 20, "all 20 messages reached C, 10 of them with B gone");
+    CHECK(count_ev('*', "\"ev\":\"failed\"") == 0, "no failed sends");
+}
+
+/* One X flood frame exactly as security/attacks/attacks.py flood_insider builds it: X's own
+ * pseudonym + derived MAC for the current epoch, random undecryptable body, valid link_tag. */
+static void x_send_flood_frame(void)
+{
+    const gm_node_keys_t *x = keys_X();
+    uint16_t ep = gm_wire_epoch((uint32_t)(gm_watch_now(&WATCH) / 60000));
+    rt_frame_t f;
+    uint8_t *raw = (uint8_t *)&f;
+    for (size_t i = 0; i < sizeof f; i++) raw[i] = (uint8_t)xs(&wt_rng);
+    f.ver_type = RT_FRAME_DATA;
+    f.flags = 0;
+    memcpy(f.msg_id, X_MARK, 2);
+    f.ttl = 5;
+    f.hop_count = 0;
+    memset(f.next_hop, 0, 4);
+    gm_pseudonym(x->pseudo_secret, ep, f.src_pseudo);
+    gm_put_be16(f.epoch, ep);
+    gm_link_tag(x->network_key, &f, f.link_tag);
+    uint8_t mac[6];
+    gm_mac(x->pseudo_secret, ep, mac);
+    air_send(XIDX, mac, raw);
+}
+
+static void run_with_flood(uint64_t ms, int rate)
+{
+    uint64_t every = 1000 / (uint64_t)rate;
+    for (uint64_t t = 0; t < ms; t++) {
+        if (T % every == 0) x_send_flood_frame();
+        run(1);
+    }
+}
+
+static uint32_t sum_log(simnode_t *const *ns, int n, int ev)
+{
+    uint32_t s = 0;
+    for (int i = 0; i < n; i++) s += ns[i]->node.st.log_counts[ev];
+    return s;
+}
+
+static void test_demo2_flood_then_block(void)
+{
+    printf("Demo 2: X floods as an insider (flood loud, 80/s), W blocks X, nodes drop it\n");
+    simnode_t *a, *b, *c, *d;
+    build_diamond(900, &a, &b, &c, &d);
+    simnode_t *near_x[3];
+    near_x[0] = a; near_x[1] = b; near_x[2] = d;
+    LINK[XIDX][0] = LINK[XIDX][1] = LINK[XIDX][3] = true;      /* X sits by A, B and D */
+    LINK[XIDX][MAXN] = true;                                   /* and W hears it */
+
+    /* before the BLOCK: the mesh feels it */
+    run_with_flood(8000, 80);
+    CHECK(count_ev('W', "\"node\":\"X\",\"id_ok\":true") > 300, "W tags the flood as node X (id_ok) for the IPS");
+    CHECK(g_x_relays > 50, "nodes relay X's frames (OLED rx/tx climb, LEDs blink blue)");
+    CHECK(sum_log(near_x, 3, RT_LOG_RATE_LIMITED) > 0, "per-sender limit (~20/s) caps what each node takes");
+    CHECK(sum_log(near_x, 3, RT_LOG_BLOCKED) == 0, "nothing blocked yet");
+
+    /* the IPS asks W for a BLOCK on X (what live.py sends) */
+    gm_watch_block(&WATCH, 'X', NULL, NULL, "flood", gm_watch_now(&WATCH) + 60000);
+    run_with_flood(4000, 80);
+    CHECK(count_ev('A', "\"ev\":\"block\"") == 1 && count_ev('B', "\"ev\":\"block\"") == 1
+          && count_ev('D', "\"ev\":\"block\"") == 1, "A, B and D applied the signed BLOCK during the flood");
+
+    /* after the BLOCK: X's frames die at the first hop (red LED), the mesh works again */
+    int relays_at_block = g_x_relays;
+    uint32_t blocked0 = sum_log(near_x, 3, RT_LOG_BLOCKED);
+    int rx0 = count_ev('C', "\"from\":\"A\"");
+    for (int i = 0; i < 5; i++) { gm_node_send(&a->node, 'C', "still here", 10); run_with_flood(1000, 80); }
+    CHECK(sum_log(near_x, 3, RT_LOG_BLOCKED) - blocked0 > 500, "nodes drop X as blocked (red LED on A, B, D)");
+    CHECK(g_x_relays - relays_at_block <= 3, "no more X frames relayed");
+    run(6000);
+    CHECK(count_ev('C', "\"from\":\"A\"") - rx0 == 5, "A -> C still delivered while X keeps flooding");
+
+    /* X's identity rotates at the minute (attacks.py follows it); W re-issues, block still holds */
+    uint64_t to_next_min = 60000 - (gm_watch_now(&WATCH) % 60000) + 3000;
+    run_with_flood(to_next_min, 80);
+    uint32_t blocked1 = sum_log(near_x, 3, RT_LOG_BLOCKED);
+    int relays1 = g_x_relays;
+    run_with_flood(5000, 80);
+    CHECK(sum_log(near_x, 3, RT_LOG_BLOCKED) - blocked1 > 500 && g_x_relays - relays1 <= 3,
+          "after X's epoch rotation the block still holds");
+}
+
 int main(int argc, char **argv)
 {
     PRINT = argc > 1 && !strcmp(argv[1], "-v");
     test_two_boards_debug_clock();
     test_line_with_watchtower();
+    test_first_sync_no_factory_mac();
     test_outsider();
     test_watchtower_log_and_block();
     test_block_two_hops_after_beacon();
+    test_demo1_multihop_unplug_b();
+    test_demo2_flood_then_block();
     printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail ? 1 : 0;
 }

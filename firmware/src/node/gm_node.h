@@ -149,6 +149,11 @@ void gm_node_status(gm_node_t *n);
 /* Prints {"ev":"boot"} with fingerprints (compare with firmware/config/roster.json). */
 void gm_node_boot_banner(gm_node_t *n, const char *fw_version);
 
+/* Micro-benchmark: time per-message encrypt and trial-decrypt over `runs` iterations (0 = default)
+ * and print {"ev":"bench",...} with enc_us/dec_us. Needs the node synced with at least one peer.
+ * Fills the "encrypt + decrypt on ESP32-S3" row of the results table. */
+void gm_node_bench(gm_node_t *n, uint32_t runs);
+
 /* Helpers for the OLED / status. */
 uint64_t    gm_node_mesh_ms(gm_node_t *n);
 uint16_t    gm_node_wire_epoch(gm_node_t *n);

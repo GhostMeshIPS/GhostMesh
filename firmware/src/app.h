@@ -2,6 +2,10 @@
 // The protocol logic is NOT here: it's in node/gm_node.c (+ routing/ and crypto/), which is portable.
 #pragma once
 
+#ifndef GM_SERIAL_BAUD
+#define GM_SERIAL_BAUD 115200   // S3 native USB ignores it; WROOM boards set 921600 in platformio.ini
+#endif
+
 #include <Arduino.h>
 
 extern "C" {
@@ -22,7 +26,7 @@ struct gm_rx_item_t {
 // Commands parsed from serial (loop task), executed on the processing task.
 enum gm_cmd_kind_t : uint8_t {
     CMD_SEND, CMD_STATUS, CMD_SET_TIME, CMD_VERBOSE, CMD_TXPOWER, CMD_RSSI_GATE,
-    CMD_ALLOW, CMD_ROTATE_MAC, CMD_WIPE_STATE, CMD_REBOOT, CMD_AUTO,
+    CMD_ALLOW, CMD_ROTATE_MAC, CMD_WIPE_STATE, CMD_REBOOT, CMD_AUTO, CMD_BENCH,
 };
 
 struct gm_cmd_t {

@@ -97,6 +97,20 @@ def log_write(state, line):
         state["logf"].flush()
 
 
+def sync_clock(port, state, force=False):
+    """Set the mesh clock from this laptop. Debounced: W nags every 5 s if its clock is unset
+    (and reopening the port on Windows resets W and wipes its clock, PROTOCOL.md 10 D2), so only
+    answer every ~2 s. Writes are serialised with the main thread's command writes."""
+    if not state["sync"]:
+        return                                    # this session isn't the clock source
+    now = time.time()
+    if not force and now - state["last_sync"] < 2:
+        return
+    state["last_sync"] = now
+    with state["wlock"]:
+        port.write((json.dumps({"cmd": "set_time", "unix_ms": int(now * 1000)}) + "\n").encode())
+
+
 def reader(port, state):
     while True:
         try:
@@ -113,6 +127,9 @@ def reader(port, state):
         except json.JSONDecodeError:
             continue
         log_write(state, line)
+        # W lost its clock (reset, or never set): re-send set_time so beacons/BLOCKs resume.
+        if ev.get("ev") in ("warning", "error") and ev.get("reason") == "clock_not_set":
+            sync_clock(port, state)
         if state["raw"]:
             print(line, flush=True)
         elif is_log(ev):
@@ -123,28 +140,40 @@ def reader(port, state):
             print(safe_fmt(ev), flush=True)
 
 
-def send(port, obj):
-    port.write((json.dumps(obj) + "\n").encode())
+def send(port, obj, state=None):
+    data = (json.dumps(obj) + "\n").encode()
+    if state and state.get("wlock"):
+        with state["wlock"]:
+            port.write(data)
+    else:
+        port.write(data)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", required=True)
-    ap.add_argument("--baud", type=int, default=115200)
+    ap.add_argument("--baud", type=int, default=921600)   # W is a WROOM-32E (UART bridge); S3 nodes ignore it
     ap.add_argument("--sync", action="store_true", help="set the clock from this laptop at start")
     ap.add_argument("--log", help="append every JSON line to this file (JSON lines)")
     args = ap.parse_args()
 
-    port = serial.Serial(args.port, args.baud, timeout=1)
-    state = {"raw": False, "verbose": False, "log_lines": 0, "logf": None}
+    port = serial.Serial()
+    port.port = args.port
+    port.baudrate = args.baud
+    port.timeout = 1
+    port.dtr = False                             # don't reset the S3 on open (native USB); see PROTOCOL.md 10 D2
+    port.rts = False
+    port.open()
+    state = {"raw": False, "verbose": False, "log_lines": 0, "logf": None,
+             "sync": args.sync, "last_sync": 0.0, "wlock": threading.Lock()}
     if args.log:
         os.makedirs(os.path.dirname(os.path.abspath(args.log)), exist_ok=True)   # create ips/data/raw/ etc.
         state["logf"] = open(args.log, "a", encoding="utf-8")
         print(f"   logging to {args.log}")
     threading.Thread(target=reader, args=(port, state), daemon=True).start()
-    send(port, {"cmd": "status"})
+    send(port, {"cmd": "status"}, state)
     if args.sync:
-        send(port, {"cmd": "set_time", "unix_ms": int(time.time() * 1000)})
+        sync_clock(port, state, force=True)      # start the mesh clock; reader re-sends it on clock_not_set
 
     try:
         for line in sys.stdin:
@@ -155,11 +184,12 @@ def main():
                 state["raw"] = not state["raw"]
             elif line == "/verbose":
                 state["verbose"] = not state["verbose"]
-                send(port, {"cmd": "verbose", "on": state["verbose"]})
+                send(port, {"cmd": "verbose", "on": state["verbose"]}, state)
             elif line == "/time":
-                send(port, {"cmd": "set_time", "unix_ms": int(time.time() * 1000)})
+                state["last_sync"] = time.time()     # manual set; keep the reader from double-sending
+                send(port, {"cmd": "set_time", "unix_ms": int(state["last_sync"] * 1000)}, state)
             elif line == "/status":
-                send(port, {"cmd": "status"})
+                send(port, {"cmd": "status"}, state)
                 if state["log_lines"]:
                     print(f"   ({state['log_lines']} watchtower log lines so far; /verbose to see them)")
             elif line.startswith("/mark"):
@@ -172,23 +202,24 @@ def main():
                 msg = {"cmd": cmd, "node": node.strip().upper()}
                 if cmd == "block":
                     msg.update(reason="flood", until=round(time.time() + 120, 3))
-                send(port, msg)
+                send(port, msg, state)
             elif line.startswith("/auto"):
                 parts = line.split()
                 if len(parts) == 3 and len(parts[1]) == 1 and parts[2].isdigit():
-                    send(port, {"cmd": "auto", "to": parts[1].upper(), "every_s": int(parts[2])})
+                    send(port, {"cmd": "auto", "to": parts[1].upper(), "every_s": int(parts[2])}, state)
                 else:
-                    send(port, {"cmd": "auto", "to": "", "every_s": 0})
+                    send(port, {"cmd": "auto", "to": "", "every_s": 0}, state)
 
             elif line.startswith("{"):
-                port.write((line + "\n").encode())
+                with state["wlock"]:                 # raw JSON passthrough
+                    port.write((line + "\n").encode())
             elif ":" in line and len(line.split(":", 1)[0].strip()) == 1:
                 to, text = line.split(":", 1)
                 text = text.strip()
                 if len(text.encode()) > 152:
                     print("   message too long (152 bytes max)")
                     continue
-                send(port, {"cmd": "send", "to": to.strip().upper(), "text": text})
+                send(port, {"cmd": "send", "to": to.strip().upper(), "text": text}, state)
             else:
                 print("   usage:  B: your message  |  /time /status /verbose /raw  |  /auto C 20, /auto off  |  /block C, /unblock C")
     except KeyboardInterrupt:

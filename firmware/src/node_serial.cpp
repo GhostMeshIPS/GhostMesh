@@ -49,6 +49,9 @@ void app_handle_line(const char *line)
         const char *to = doc["to"] | "";
         c.to = strlen(to) == 1 ? (char)toupper(to[0]) : 0;
         c.value = doc["every_s"] | 0;
+    } else if (!strcmp(cmd, "bench")) {             // time encrypt + trial-decrypt on this board
+        c.kind = CMD_BENCH;
+        c.value = doc["runs"] | 0;
     } else if (!strcmp(cmd, "wipe_state")) {
         c.kind = CMD_WIPE_STATE;
     } else if (!strcmp(cmd, "reboot")) {
