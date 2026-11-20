@@ -23,20 +23,33 @@ def read_labeled(path):
     """A recorded session plus its ground truth (datasets/README.md), as a DataFrame with `label`.
 
     Labels come from `<name>.labels.jsonl` next to the log: one row per attack run,
-    {"label": "flood", "node": "X", "start": ..., "end": ...}. Packets from that node (or tagged
-    "?") inside [start, end] get the label; everything else is "normal". No labels file = all normal.
+    {"label": "flood", "node": "X", "start": ..., "end": ..., "variant": "loud"} (decision 19).
+    Inside [start, end] these packets get the label:
+      * tagged with that node (normally "X") or "?",
+      * id_ok False under ANY letter: X's replays and `pseudo` spoofs carry the copied node's
+        pseudonym, so W tags them "A"/"B"/..., but from X's MAC, so id_ok is False.
+    Everything else is "normal". No labels file = all normal. `variant` is kept for per-variant results.
+    Known gap: a `pseudo_mac` spoof copies the victim's MAC as well, so its frames look exactly like the
+    victim's in the log (id_ok True) and stay "normal" here; only the signal strength tells them apart.
     """
     import json
     import os
     df = read_file(path)
     df["label"] = "normal"
+    df["variant"] = ""
     labels_path = path[:-len(".jsonl")] + ".labels.jsonl"
     if os.path.exists(labels_path):
         with open(labels_path) as f:
             for row in (json.loads(line) for line in f if line.strip()):
-                who = df["node"].isin([row.get("node", "X"), "?"]) if "node" in df else True
+                if "node" in df:
+                    who = df["node"].isin([row.get("node", "X"), "?"])
+                    if "id_ok" in df:
+                        who |= df["id_ok"] == False                    # noqa: E712 (NaN = unknown, not False)
+                else:
+                    who = True
                 in_time = df["t"].between(row["start"], row["end"])
                 df.loc[who & in_time, "label"] = row["label"]
+                df.loc[who & in_time, "variant"] = row.get("variant", "")
     return df
 
 
@@ -79,7 +92,7 @@ def open_serial(port):
     return ser
 
 
-def serial_stream(ser, on_event=None):
+def serial_stream(ser, on_event=None, on_line=None):
     """Yield packets from the live watchtower, forever.
 
     The watchtower prints two kinds of line (PROTOCOL.md 10.1 D3):
@@ -88,6 +101,7 @@ def serial_stream(ser, on_event=None):
     The laptop is the mesh's clock source: we send set_time on connect and again whenever W
     reports clock_not_set (it lost its clock in a reset). Without it W sends no TIME beacons and
     refuses BLOCKs. Frame lines from before the clock is set are dropped by parse_line.
+    on_line(text) gets every JSON line exactly as W sent it (live.py --log saves them).
     """
     last_sync = 0.0
 
@@ -102,6 +116,8 @@ def serial_stream(ser, on_event=None):
         line = ser.readline()                       # waits up to timeout=1 s for a full line
         if not line:
             continue                                # timeout, nothing heard: keep waiting
+        if on_line and line.lstrip().startswith(b"{"):
+            on_line(line.decode("utf-8", "replace").strip())
         event = parse_event(line)
         if event is not None:
             if needs_clock(event):
@@ -115,7 +131,7 @@ def serial_stream(ser, on_event=None):
             yield pkt
 
 
-def watchtower_stream(port, on_event=None, on_connect=None, retry_s=2.0):
+def watchtower_stream(port, on_event=None, on_connect=None, retry_s=2.0, on_line=None):
     """serial_stream that survives the USB cable being wiggled or unplugged.
 
     If the port disappears, we close it, wait, and reopen it (forever), instead of crashing
@@ -138,7 +154,7 @@ def watchtower_stream(port, on_event=None, on_connect=None, retry_s=2.0):
             on_connect(ser, first)
         first = False
         try:
-            yield from serial_stream(ser, on_event)
+            yield from serial_stream(ser, on_event, on_line)
         except OSError as err:
             print(f"  [watchtower] connection lost ({err}); reconnecting...")
             try:

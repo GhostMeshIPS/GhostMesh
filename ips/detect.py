@@ -39,6 +39,9 @@ BENCH_PATH = "models/benchmark.json"    # test-session scores of all 3 detectors
 # Real hardware recordings with NO attacks in them (in git, see datasets/README.md).
 # Nov 18 smoke test: A, B, C + W, ~18 min, X never powered on. Missing files are skipped.
 REAL_NORMAL_LOGS = ["datasets/2026-11-18_normal_01.jsonl"]
+# Real hardware with harmless events but no attacks: test only, never trained on (datasets/README.md).
+# Nov 17 bench test: B unplugged, a block + unblock of C, a W outage, C moved to a weak link.
+REAL_EVENT_LOGS = ["datasets/2026-11-17_mixed_01.jsonl"]
 
 
 def rule_detect(feats):
@@ -186,7 +189,7 @@ if __name__ == "__main__":
         "Isolation Forest": evaluate(y_test, iforest_detect(model, test)),
         "Random Forest": evaluate(y_test, test["pred_rf"] != "normal"),
     }
-    print("\n=== Benchmark on test_session (slow + outsider flood, routing abuse, replay, spoof, node B unplugged) ===")
+    print("\n=== Benchmark on test_session (low_slow, outsider + cycling floods, forged CTRL, routing abuse, 90 s replay, spoof, B unplugged) ===")
     for who, s in bench.items():
         print_scores(who[:8], s)
     with open(BENCH_PATH, "w") as f:
@@ -216,3 +219,13 @@ if __name__ == "__main__":
                              ("Random Forest", rf_detect(rf, real) != "normal")]:
             print(f"{who[:8]:<8} false alarms {flagged.mean():.1%}  ({int(flagged.sum())} windows)"
                   + ("   <- trained on this data" if "trained" in who else ""))
+
+    # --- Same check on real hardware with harmless events (nobody trained on it) ---
+    event_logs = [p for p in REAL_EVENT_LOGS if os.path.exists(p)]
+    if event_logs:
+        ev = pd.concat([build_features(read_file(p)) for p in event_logs], ignore_index=True)
+        print(f"\n=== False alarms on real hardware with events ({', '.join(event_logs)}: {len(ev)} windows, "
+              f"unplug / block / W outage, no attacks) ===")
+        for who, flagged in [(RULE_NAME, rule_detect(ev)), ("Isolation Forest", iforest_detect(model, ev)),
+                             ("Random Forest", rf_detect(rf, ev) != "normal")]:
+            print(f"{who[:8]:<8} false alarms {flagged.mean():.1%}  ({int(flagged.sum())} windows)")

@@ -3,16 +3,24 @@ from statistics import median
 
 import pandas as pd
 
-from schema import UNKNOWN_NODE, WATCHTOWER
+from schema import UNKNOWN_INSIDER, UNKNOWN_NODE, WATCHTOWER
 
 WINDOW = 1.0 # seconds per window
-STALE_AFTER = 60   # a msg_id heard again after this many seconds is suspicious (seen-cache expiry)
+STALE_AFTER = 20   # a msg_id heard again after this many seconds is suspicious. Honest repeats on the
+                   # real boards came at most 9.4 s after the first copy (Nov 17 + 18 logs); Jose's
+                   # shortest replay is 30 s old (decision 20)
 
 
 def identity_of(pkt):
-    """Who we track a single packet as: the node letter, or its MAC if there's no usable letter."""
+    """Who we track a single packet as (see add_identity for the rules)."""
     node = pkt.get("node")
-    return node if node and node == node and node != UNKNOWN_NODE else pkt["mac"]   # node == node: not NaN
+    if not node or node != node:                      # missing or NaN (node == node is False for NaN)
+        return pkt["mac"]
+    if node == UNKNOWN_NODE:
+        return UNKNOWN_INSIDER if pkt.get("link_ok") == True else pkt["mac"]   # noqa: E712 (numpy bools too)
+    if pkt.get("id_ok") == False:                     # noqa: E712. Someone's pseudonym from a different radio
+        return pkt["mac"]
+    return node
 
 
 def add_identity(df):
@@ -21,17 +29,29 @@ def add_identity(df):
     The watchtower tags each packet with the real node ("A".."D", "X") because it can
     work out pseudonyms. MAC and pseudonym rotate every 60 s; the node letter doesn't,
     so grouping by it lets the IPS follow one board across rotations.
-    Fallback to the MAC when there's no usable letter:
-      * the field is missing (older logs, or a sim without it),
-      * it's "?" (no real node matches). Using the MAC keeps two different unknown
-        radios apart instead of lumping them into one "?" identity.
+    Exceptions, so the IPS blames the radio actually transmitting:
+      * no letter (older logs, Rashad's sim): the MAC.
+      * "?" with a failed link_tag (an outsider without the network key): the MAC, which keeps
+        two different unknown radios apart.
+      * "?" with a VALID link_tag: UNKNOWN_INSIDER, one identity for all of them. A keyed attacker
+        that changes pseudonym + MAC every few frames (`cycling`) would otherwise be dozens of
+        tiny identities. Honest boards almost never make these (3 frames in the 18 min Nov 18 log).
+      * a letter but id_ok False: the frame uses that node's pseudonym but comes from ANOTHER
+        radio's MAC (a replay, or a spoofer using its own MAC). Tracked by that MAC, so the real
+        node is never blamed (or blocked) for it. 4 such frames in 38 min of real honest traffic.
     """
     df = df.copy()
-    if "node" in df.columns:
-        known = df["node"].notna() & (df["node"] != UNKNOWN_NODE)
-        df["node"] = df["node"].where(known, df["mac"])
-    else:
-        df["node"] = df["mac"]
+    mac = df["mac"]
+    if "node" not in df.columns:
+        df["node"] = mac
+        return df
+    node = df["node"]
+    link_ok = df["link_ok"] if "link_ok" in df.columns else pd.Series(False, index=df.index)
+    id_bad = (df["id_ok"] == False) if "id_ok" in df.columns else pd.Series(False, index=df.index)  # noqa: E712 (NaN = not bad)
+    letter = node.notna() & (node != UNKNOWN_NODE) & ~id_bad
+    insider = (node == UNKNOWN_NODE) & (link_ok == True)                                           # noqa: E712
+    out = mac.where(~letter, node)
+    df["node"] = out.where(~insider, UNKNOWN_INSIDER)
     return df
 
 
@@ -60,7 +80,8 @@ class PacketTracker:
                       The usual sum is LEARNED (most common so far), not hard-coded. CTRL is left out:
                       W's own frames use a different TTL (sum 7).
     """
-    MEMORY_S = 180      # same as the nodes' long replay cache (Jose, PROTOCOL.md 9.7)
+    MEMORY_S = 300      # longer than the nodes' 180 s replay cache (PROTOCOL.md 9.7), so even Jose's
+                        # oldest replay (240 s, decision 20) is recognised as an old msg_id
     RSSI_HISTORY = 120  # packets per identity (~40 s of a busy node): long enough that a
                         # spoofer's own packets can't quickly drag the "usual level" towards it
     RSSI_MIN = 10       # need this many packets before judging deviations

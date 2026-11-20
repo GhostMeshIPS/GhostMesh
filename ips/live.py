@@ -25,10 +25,10 @@ import pandas as pd
 
 from detect import FEATURES, IF_PATH, RF_PATH, iforest_detect, rule_detect, train_rf
 from explain import EVIDENCE, explain
-from features import WINDOW, PacketTracker, build_features
+from features import WINDOW, PacketTracker, build_features, identity_of
 from ingest import read_file, replay, watchtower_stream
 from retention import WINDOWS_MAX_AGE_S, prune_jsonl
-from schema import NODE_IDS, WATCHTOWER, encode_cmd, make_block_cmd, make_unblock_cmd
+from schema import KEYS_NODES, UNKNOWN_INSIDER, WATCHTOWER, encode_cmd, make_block_cmd, make_unblock_cmd
 
 BUFFER_SECONDS = 10   # recent history kept in memory (needed for gaps across windows)
 CONFIRM_WINDOWS = 2   # attack must be seen in this many windows in a row before acting
@@ -128,9 +128,9 @@ class LiveIPS:
 
     def note_activity(self, pkt):
         """Bookkeeping for the missing-KEYS check: who is alive, and when they started KEYS floods."""
-        node, t = pkt.get("node"), pkt["t"]
-        if node not in NODE_IDS:              # only our known boards ("?" radios have no KEYS duty)
-            return
+        node, t = identity_of(pkt), pkt["t"]
+        if node not in KEYS_NODES:            # only A-D have a KEYS duty: not "?" radios, not X (the attack
+            return                            # board never sends KEYS, decision 18), not a replayer's MAC
         if t - self.last_heard.get(node, -1e9) > ACTIVE_GAP_S:
             self.active_since[node] = t       # it was off (or is new): give it a full minute first
         self.last_heard[node] = t
@@ -233,13 +233,26 @@ class LiveIPS:
         """Act on a confirmed attack. `first` = the moment it was confirmed (avoid repeat alerts)."""
         if attack in ALERT_ONLY:
             if first:
-                self.event(now, "ALERT", node, attack, "alert only (blocking would cut off the victim)",
+                victim = self.claimed_as(node)
+                who = f"a radio using Node {victim}'s identity" if victim else "a radio using another node's identity"
+                self.event(now, "ALERT", node, attack,
+                           f"alert only: {who}; blocking that identity would cut off the real node",
                            self.evidence(node))
         elif attack in BLOCK_ATTACKS and node in self.trusted:
             if first:
                 self.event(now, "ALERT", node, attack,
                            "alert only: this board is the watchtower (trusted), so it is never blocked",
                            self.evidence(node))
+        elif attack in BLOCK_ATTACKS and node == UNKNOWN_INSIDER:
+            # Someone with the network key behind pseudonyms that match no node, e.g. the `cycling`
+            # flood (new pseudonym + MAC every 5 frames). A BLOCK names one (pseudo, MAC) pair, which
+            # is already gone by the time it is sent, so it can't help: alert the operator instead.
+            if first:
+                why = ("old frames re-sent under pseudonyms that expired minutes ago; the nodes already drop "
+                       "them, and there is no live identity to block" if attack == "replay" else
+                       "a radio with the network key keeps changing to identities that match no node, "
+                       "so a BLOCK can't follow it")
+                self.event(now, "ALERT", node, attack, f"alert only: {why}", self.evidence(node))
         elif attack in BLOCK_ATTACKS and node not in self.blocks and node not in self.dismissed:
             # new attack, or still attacking after an old block expired
             jump = self.rssi_jump(node)
@@ -261,6 +274,13 @@ class LiveIPS:
                 self.pending[node] = (attack, ev, False)
                 self.event(now, "PENDING", node, attack, "waiting for the operator to confirm the BLOCK", ev)
 
+    def claimed_as(self, node):
+        """The node letter a radio tracked by its MAC is claiming to be (W's tag on its frames), or None.
+        Used to name the victim of a spoof or replay: the radio is X, the identity is someone else's."""
+        tags = Counter(p.get("node") for p in self.buffer
+                       if identity_of(p) == node and p.get("node") in KEYS_NODES)
+        return tags.most_common(1)[0][0] if tags else None
+
     def on_air(self, node):
         """The (pseudo, mac) pair doing the attacking for this node right now.
 
@@ -272,7 +292,7 @@ class LiveIPS:
             return "", ""
         since = self.buffer[-1]["t"] - CONFIRM_WINDOWS
         pairs = Counter((p["pseudo"], p["mac"]) for p in self.buffer
-                        if p["t"] >= since and (p.get("node") == node or p["mac"] == node))
+                        if p["t"] >= since and identity_of(p) == node)
         return pairs.most_common(1)[0][0] if pairs else ("", "")
 
     def block(self, node, attack, now, evidence, note, pair_only=False):
@@ -415,9 +435,15 @@ def main():
     parser.add_argument("--file", help="replay a .jsonl log")
     parser.add_argument("--port", help="watchtower serial port, e.g. /dev/tty.usbserial-0001")
     parser.add_argument("--speed", type=float, default=1.0, help="replay speed (10 = 10x faster)")
+    parser.add_argument("--log", metavar="FILE",
+                        help="with --port: also save every line from W to FILE (same format as chat_client "
+                             "--log), e.g. datasets/2026-11-20_flood_01.jsonl, so a session can be recorded "
+                             "while the IPS runs live")
     parser.add_argument("--trusted", nargs="*", default=[], metavar="NODE",
                         help="nodes never auto-blocked, e.g. --trusted D when D doubles as the watchtower")
     args = parser.parse_args()
+    if args.log and not args.port:
+        parser.error("--log needs --port (it records the live watchtower)")
 
     # Start each run with empty logs so the dashboard shows only this run
     os.makedirs("data", exist_ok=True)
@@ -450,7 +476,17 @@ def main():
             if ev.get("ev") == "clock_set" and ips:
                 ips.resend_blocks()          # W was reset (its blocks are gone) and now accepts BLOCKs again
 
-        source = watchtower_stream(args.port, on_event=on_event, on_connect=on_connect)
+        on_line = None
+        if args.log:
+            os.makedirs(os.path.dirname(os.path.abspath(args.log)), exist_ok=True)
+            raw_log = open(args.log, "a", encoding="utf-8")     # append: never overwrite a recording
+            print(f"  saving every watchtower line to {args.log}")
+
+            def on_line(text):
+                raw_log.write(text + "\n")
+                raw_log.flush()                  # a crash or Ctrl+C loses nothing
+
+        source = watchtower_stream(args.port, on_event=on_event, on_connect=on_connect, on_line=on_line)
     else:
         source = replay(args.file or "test_session.jsonl", speed=args.speed)
         send_cmd = lambda cmd: print("  -> would send:", json.dumps(cmd))   # no hardware yet

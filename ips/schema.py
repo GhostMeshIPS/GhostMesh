@@ -46,6 +46,12 @@ MIN_MESH_TIME = 1e9      # before W's clock is set, its `t` is seconds since boo
 NODE_IDS = {"A", "B", "C", "D", "W", "X"}
 UNKNOWN_NODE = "?"
 WATCHTOWER = "W"
+ATTACKER = "X"             # the attack board: silent between attacks, never sends KEYS (decision 18)
+KEYS_NODES = {"A", "B", "C", "D"}   # boards that must keep sending KEYS (the missing-KEYS check)
+# The IPS's name for every "?" frame that still carries a VALID link_tag: someone with the network
+# key hiding behind pseudonyms that match no node (the `cycling` flood swaps pseudonym + MAC every
+# 5 frames, decision 20; old replays). Grouped into one identity, or each fake one looks tiny.
+UNKNOWN_INSIDER = "?insider"
 
 # Only present in synthetic / labeled data; live watchtower data has no label
 LABEL_FIELD = "label"

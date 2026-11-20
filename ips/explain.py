@@ -20,7 +20,9 @@ TIMEOUT_S = 60
 
 # Friendly names, keyed by the watchtower's `node` letter (stable across MAC rotation).
 # Anything else is a MAC: a radio the watchtower couldn't match to a real node ("?").
-NODE_NAMES = {"A": "Node A", "B": "Node B", "C": "Node C", "D": "Node D", "X": "Node X"}
+NODE_NAMES = {"A": "Node A", "B": "Node B", "C": "Node C", "D": "Node D", "X": "Node X",
+              # features.UNKNOWN_INSIDER: "?" frames with a valid network tag, grouped together
+              "?insider": "Unknown keyed radio (changing identities)"}
 
 # Our own fixed wording for each attack (never taken from packets)
 ATTACK_TEXT = {

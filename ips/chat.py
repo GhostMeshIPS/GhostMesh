@@ -41,6 +41,7 @@ GLOSSARY = """\
 - Routing abuse: a radio lying about how many hops the messages it relays have travelled (claiming fewer), so it looks like a shortcut and messages flow through it.
 - Outsider: a radio without our network key. Its packets fail the link check, so nodes drop them, but the IPS still sees and blocks it.
 - Replay: a radio re-sending old captured packets.
+- Unknown keyed radio ("?insider"): a radio that has our network key but sends under identities that match no node, e.g. one that switches to a new fake identity every few packets.
 - Spoofing: a radio pretending to be another node. Only an alert, because blocking that identity would also cut off the real node."""
 
 PLAYBOOK = """\
@@ -48,7 +49,8 @@ PLAYBOOK = """\
 - One of our own nodes (A, B, C or D) was blocked: it could be a false alarm or a faulty/compromised board. Wait 60 seconds for the block to expire. If it is blocked again, unplug that node and check it (firmware bug causing rapid resends, or tampering). The mesh reroutes around it automatically.
 - Spoofing alert: the IPS deliberately does NOT block, because that would also cut off the real node. Confirm with the real node's owner in person, and watch whether its signal strength suddenly jumps.
 - An attack is waiting for confirmation because the signal is "off this node's usual level": another radio may be using that node's identity. The IPS never blocks a whole node on that kind of evidence by itself. If you click Confirm BLOCK, only the radio using that identity is blocked, not the real node.
-- Replay attack: replayed packets are still encrypted, so the attacker cannot read them. Nodes ignore duplicates. The IPS blocks the replaying radio.
+- Replay attack: replayed packets are still encrypted, so the attacker cannot read them. Nodes ignore duplicates. The IPS blocks the replaying radio when it can name it; very old replays (identities that expired minutes ago) only get an alert, since there is nothing live to block.
+- Unknown keyed radio alert ("?insider"): it keeps switching identity, so a BLOCK can't follow it. Nodes still limit how much they relay. Find it physically (stronger signal = closer to the watchtower) and switch it off.
 - A node shows SILENT: it stopped transmitting. Usually unplugged, out of range or out of battery. Messages reroute through the other nodes (e.g. A to C via D instead of B) within about 10 seconds.
 - A message did not arrive (no double tick): the sender retries automatically 3 times (after 1, 2 and 4 seconds). If it still fails, check that a path exists on the mesh map, then resend.
 - Is the network safe right now: it is safe if there are no active blocks or attacking radios in the live status.
