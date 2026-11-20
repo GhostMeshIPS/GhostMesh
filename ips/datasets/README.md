@@ -20,18 +20,21 @@ Keep **one full session aside for testing only**: never train on it.
 The watchtower log schema (see `ips/schema.py`, and PROTOCOL.md section 11), plus the optional
 `node` field (`A`-`D`, `X`, `W`, or `?`).
 
-## Labels file (PROPOSED: Jose to confirm)
+## Labels file (confirmed by Jose, Nov 19: decision 19)
 
 One JSON line per attack run, with times on the same Unix clock as the log:
 
 ```json
-{"label": "flood", "node": "X", "start": 1731264120.0, "end": 1731264150.0}
+{"label": "flood", "node": "X", "start": 1731264120.0, "end": 1731264150.0, "variant": "loud"}
 ```
 
 - `label`: `flood`, `replay`, `spoof` or `routing`.
 - `node`: the attacking board (normally `X`). Packets tagged `?` in that time span are also
   counted as the attack (replayed and forged frames often can't be matched to a node).
+- `variant` (optional): which version of the attack, e.g. `loud`, `slow`, `outsider`, `age_90s`,
+  `mac_copied`. Training uses `label`; `variant` is for per-variant results. The IPS ignores it.
 - Everything not covered by a label row is `normal`, including relays passing the attack along.
+- The attack scripts write this file themselves (`security/attacks/gmx.py`, `LabelLog`).
 
 Load a labelled recording with `ingest.read_labeled("datasets/<name>.jsonl")`.
 

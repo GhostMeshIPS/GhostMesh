@@ -535,3 +535,32 @@ and evaluate the IPS, and the video needs a live attack. X didn't exist yet.
 | **Jose builds X** | Yunus | Yunus is on the factory-MAC race and the serial-reset bug, which block the demo. The X build is small (reuses `radio.cpp` and the serial helper) and sits next to the attack scripts |
 | **Silent between attacks** | X as a normal node | The IPS is trained on normal traffic with X off (16f) and the runbook keeps X quiet until the attack segment; a silent sniffer matches both and needs no routing or key layer on X |
 
+---
+
+## 19. Labels file format
+
+**Hannan's format plus an optional `variant`.** Keeping `label` to the four classes the IPS already
+trains on means no IPS change (`read_labeled` ignores extra keys). Several attacks come in versions that
+behave very differently (an outsider flood is dropped at the first hop, an insider flood is relayed; a
+replay 30 s old hits a different cache than one 2 min old), and the results table and slides need numbers
+per version. A `variant` field gives that without new label classes or file-naming conventions. The script
+that sends the frames writes the row, so start and end are exact (18).
+
+---
+
+## 20. Attack specs
+
+**Context:** the recordings have to train and evaluate the IPS (G6, G7), give the results table its replay
+number (G5), and show the threat model's known issues on real hardware.
+
+| Choice | Why |
+|---|---|
+| **Flood rates 80 / 15 / 50 / 8 per second** | Each sits on a mechanism: 80/s is far above the relays' 20/s insertion limit (10g), so most is dropped at the first hop; 15/s is under it, so relays amplify it, and it sits exactly at the IPS rule's threshold, which is where ML can beat rules (G7); 8/s is the low-and-slow residual (16f). Everything stays ≤ 100/s so the watchtower log keeps up (16e) |
+| **Outsider flood included** | The only attack an outsider can run; shows `link_tag` dropping it at the first hop and that BLOCK can't stop the airtime (threat model §8) |
+| **Three replay ages** | Each age is stopped by a different layer (seen-cache, 180 s cache, epoch window), so the recordings show the layers working separately and give an honest "replay rejection 100%" |
+| **Both spoof variants** | The pseudonym-only spoof is easy (MAC mismatch); the pseudo + MAC spoof is the O9 case the operator policy exists for |
+| **Victim followed by RSSI** | It's what a real insider could do (no access to the watchtower's map), and it turns O3 from a documented limitation into a measured one |
+| **Both routing variants** | The TTL-fixed variant defeats the sum check, so it tests whether "hop went down for the same `msg_id`" alone is enough; matches Hannan's synthetic data |
+| **Extras (cycling, CTRL forgery, watchtower outage)** | They exercise the residuals the threat model names (10b/10g identity cycling, 16d verify budget, 16b/16c watchtower loss) |
+| **Sessions per type + held-out mixed session** | A bad moment spoils one short session, not everything, and the mixed session gives a test set with a different order and timing than training |
+
