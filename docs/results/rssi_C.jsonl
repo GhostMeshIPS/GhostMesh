@@ -1,0 +1,1613 @@
+{"ev":"sent","to":"A","handle":100}
+{"ev":"delivered","to":"A","handle":100}
+{"ev":"rx","from":"A","text":"auto A#188","seq":1338441036,"rssi":-68}
+{"ev":"sent","to":"A","handle":101}
+{"ev":"delivered","to":"A","handle":101}
+{"ev":"rx","from":"A","text":"auto A#189","seq":1338441037,"rssi":-68}
+{"ev":"sent","to":"A","handle":102}
+{"ev":"delivered","to":"A","handle":102}
+{"ev":"log","what":"replay_stale","msg_id":"c8ccf3ed447427f0","ttl":3,"hop":2}
+{"ev":"log","what":"replay_stale","msg_id":"32d877f994a0072b","ttl":4,"hop":1}
+{"ev":"log","what":"replay_stale","msg_id":"9f3ab82cab68feb4","ttl":4,"hop":1}
+{"ev":"log","what":"replay_stale","msg_id":"59150b52cb7d5454","ttl":4,"hop":1}
+{"ev":"log","what":"replay_stale","msg_id":"e47f01be59179cef","ttl":5,"hop":0}
+{"ev":"log","what":"replay_stale","msg_id":"7563c5fdf5dcb7bf","ttl":5,"hop":0}
+{"ev":"log","what":"replay_stale","msg_id":"45b1a82fe217cedf","ttl":4,"hop":1}
+{"ev":"log","what":"replay_stale","msg_id":"a4cf257f49c0c214","ttl":5,"hop":0}
+{"ev":"log","what":"bad_epoch","msg_id":"62962ae9a786c3c8","ttl":5,"hop":0}
+{"ev":"log","what":"bad_epoch","msg_id":"ab825bf08e70409f","ttl":5,"hop":0}
+{"ev":"log","what":"bad_epoch","msg_id":"28c84487f27730d7","ttl":4,"hop":1}
+{"ev":"log","what":"bad_epoch","msg_id":"a2c36103ce2aa08b","ttl":4,"hop":1}
+{"ev":"log","what":"bad_epoch","msg_id":"93cf04eb58419e82","ttl":3,"hop":2}
+{"ev":"log","what":"bad_epoch","msg_id":"3f6cded43fbc9960","ttl":3,"hop":2}
+{"ev":"log","what":"bad_epoch","msg_id":"369e6228385c579f","ttl":5,"hop":0}
+{"ev":"log","what":"bad_epoch","msg_id":"d59ed1149a4db803","ttl":4,"hop":1}
+{"ev":"log","what":"bad_epoch","msg_id":"90c2593d227364d1","ttl":4,"hop":1}
+{"ev":"log","what":"bad_epoch","msg_id":"0ff7aa09d252bfbb","ttl":5,"hop":0}
+{"ev":"log","what":"bad_epoch","msg_id":"5ce543217df3f8b9","ttl":3,"hop":2}
+{"ev":"log","what":"bad_epoch","msg_id":"d1904a35c2afc42b","ttl":3,"hop":2}
+{"ev":"log","what":"bad_epoch","msg_id":"05661b9ea8c12a88","ttl":3,"hop":2}
+{"ev":"log","what":"bad_epoch","msg_id":"76076c103bb0f21b","ttl":4,"hop":1}
+{"ev":"log","what":"bad_epoch","msg_id":"8e2050a629ec0003","ttl":4,"hop":1}
+{"ev":"log","what":"bad_epoch","msg_id":"bc3cb4ca5cab1bb1","ttl":4,"hop":1}
+{"ev":"log","what":"bad_epoch","msg_id":"b0db6738dd62e84d","ttl":3,"hop":2}
+{"ev":"log","what":"bad_epoch","msg_id":"df4764389e29d756","ttl":5,"hop":0}
+{"ev":"log","what":"bad_epoch","msg_id":"d912be303ca90d0b","ttl":3,"hop":2}
+{"ev":"log","what":"bad_epoch","msg_id":"79fe2e152421d07e","ttl":4,"hop":1}
+{"ev":"log","what":"bad_epoch","msg_id":"b922f37cc4fa3b77","ttl":3,"hop":2}
+{"ev":"log","what":"bad_epoch","msg_id":"8880be2011312fd2","ttl":5,"hop":0}
+{"ev":"log","what":"bad_epoch","msg_id":"977a56718192e17b","ttl":3,"hop":2}
+{"ev":"log","what":"bad_epoch","msg_id":"a3fed43ecb64e830","ttl":3,"hop":2}
+{"ev":"epoch","epoch":35627,"pseudo":"209349b9","mac_outage_us":55269}
+{"ev":"no_beacon","secs":30}
+{"ev":"sent","to":"A","handle":104}
+{"ev":"status","name":"C","synced":true,"mesh_ms":1795202604936,"epoch":35627,"pseudo":"209349b9","rx":519,"tx":620,"keys_sent":23,"beacons":22,"delivered":99,"acked":82,"failed":21,"relayed":291,"dup":181,"cancelled":0,"bad_link_tag":0,"bad_epoch":24,"blocked":0,"not_synced":7,"stale":64,"rate_limited":0,"gate_drops":0,"allow_drops":0,"queued":0,"mac_outage_us":55269}
+{"ev":"radio","airtime_avg_us":3148,"rx_overflow":221,"tx_fail":0,"free_heap":143844,"rotate_mac":true,"rssi_gate":-127,"allow_n":0,"auto_to":"A","auto_every_s":2}
+{"ev":"delivered","to":"A","handle":104}
+{"ev":"rx","from":"A","text":"auto A#275","seq":1338441123,"rssi":-69}
+{"ev":"rx","from":"A","text":"auto A#274","seq":1338441122,"rssi":-69}
+{"ev":"rx","from":"A","text":"auto A#272","seq":1338441120,"rssi":-69}
+{"ev": "mark", "t": 1795202606.618, "note": "no pans 1.5m"}
+{"ev":"rx","from":"A","text":"auto A#276","seq":1338441124,"rssi":-69}
+{"ev":"sent","to":"A","handle":105}
+{"ev":"delivered","to":"A","handle":105}
+{"ev":"rx","from":"A","text":"auto A#273","seq":1338441121,"rssi":-69}
+{"ev":"rx","from":"A","text":"auto A#277","seq":1338441125,"rssi":-69}
+{"ev":"sent","to":"A","handle":106}
+{"ev":"delivered","to":"A","handle":106}
+{"ev":"rx","from":"A","text":"auto A#278","seq":1338441126,"rssi":-69}
+{"ev":"sent","to":"A","handle":107}
+{"ev":"delivered","to":"A","handle":107}
+{"ev":"rx","from":"A","text":"auto A#279","seq":1338441127,"rssi":-69}
+{"ev":"sent","to":"A","handle":108}
+{"ev":"delivered","to":"A","handle":108}
+{"ev":"rx","from":"A","text":"auto A#280","seq":1338441128,"rssi":-70}
+{"ev":"sent","to":"A","handle":109}
+{"ev":"delivered","to":"A","handle":109}
+{"ev":"rx","from":"A","text":"auto A#281","seq":1338441129,"rssi":-71}
+{"ev":"sent","to":"A","handle":110}
+{"ev":"delivered","to":"A","handle":110}
+{"ev":"rx","from":"A","text":"auto A#282","seq":1338441130,"rssi":-73}
+{"ev":"sent","to":"A","handle":111}
+{"ev":"delivered","to":"A","handle":111}
+{"ev":"rx","from":"A","text":"auto A#283","seq":1338441131,"rssi":-73}
+{"ev":"sent","to":"A","handle":112}
+{"ev":"delivered","to":"A","handle":112}
+{"ev":"rx","from":"A","text":"auto A#284","seq":1338441132,"rssi":-71}
+{"ev":"sent","to":"A","handle":113}
+{"ev":"rx","from":"A","text":"auto A#285","seq":1338441133,"rssi":-71}
+{"ev":"sent","to":"A","handle":114}
+{"ev":"delivered","to":"A","handle":114}
+{"ev":"delivered","to":"A","handle":113}
+{"ev":"rx","from":"A","text":"auto A#286","seq":1338441134,"rssi":-70}
+{"ev":"sent","to":"A","handle":115}
+{"ev":"delivered","to":"A","handle":115}
+{"ev":"sent","to":"A","handle":116}
+{"ev":"delivered","to":"A","handle":116}
+{"ev":"rx","from":"A","text":"auto A#287","seq":1338441135,"rssi":-70}
+{"ev":"rx","from":"A","text":"auto A#288","seq":1338441136,"rssi":-70}
+{"ev":"sent","to":"A","handle":117}
+{"ev":"delivered","to":"A","handle":117}
+{"ev":"rx","from":"A","text":"auto A#289","seq":1338441137,"rssi":-70}
+{"ev":"sent","to":"A","handle":118}
+{"ev":"delivered","to":"A","handle":118}
+{"ev":"rx","from":"A","text":"auto A#290","seq":1338441138,"rssi":-70}
+{"ev":"sent","to":"A","handle":119}
+{"ev":"delivered","to":"A","handle":119}
+{"ev":"rx","from":"A","text":"auto A#291","seq":1338441139,"rssi":-70}
+{"ev":"sent","to":"A","handle":120}
+{"ev":"delivered","to":"A","handle":120}
+{"ev":"rx","from":"A","text":"auto A#292","seq":1338441140,"rssi":-70}
+{"ev":"sent","to":"A","handle":121}
+{"ev":"delivered","to":"A","handle":121}
+{"ev":"epoch","epoch":35628,"pseudo":"a2e2313b","mac_outage_us":5340}
+{"ev":"sent","to":"A","handle":122}
+{"ev":"rx","from":"A","text":"auto A#293","seq":1338441141,"rssi":-70}
+{"ev":"delivered","to":"A","handle":122}
+{"ev":"sent","to":"A","handle":123}
+{"ev":"delivered","to":"A","handle":123}
+{"ev":"rx","from":"A","text":"auto A#294","seq":1338441142,"rssi":-70}
+{"ev":"sent","to":"A","handle":124}
+{"ev":"delivered","to":"A","handle":124}
+{"ev":"rx","from":"A","text":"auto A#295","seq":1338441143,"rssi":-70}
+{"ev":"rx","from":"A","text":"auto A#296","seq":1338441144,"rssi":-70}
+{"ev":"sent","to":"A","handle":125}
+{"ev":"delivered","to":"A","handle":125}
+{"ev":"rx","from":"A","text":"auto A#297","seq":1338441145,"rssi":-70}
+{"ev":"sent","to":"A","handle":126}
+{"ev":"delivered","to":"A","handle":126}
+{"ev":"sent","to":"A","handle":127}
+{"ev":"delivered","to":"A","handle":127}
+{"ev":"rx","from":"A","text":"auto A#298","seq":1338441146,"rssi":-70}
+{"ev":"rx","from":"A","text":"auto A#299","seq":1338441147,"rssi":-70}
+{"ev":"sent","to":"A","handle":128}
+{"ev":"delivered","to":"A","handle":128}
+{"ev":"rx","from":"A","text":"auto A#300","seq":1338441148,"rssi":-70}
+{"ev":"sent","to":"A","handle":129}
+{"ev":"delivered","to":"A","handle":129}
+{"ev":"rx","from":"A","text":"auto A#301","seq":1338441149,"rssi":-70}
+{"ev":"sent","to":"A","handle":130}
+{"ev":"delivered","to":"A","handle":130}
+{"ev":"sent","to":"A","handle":131}
+{"ev":"delivered","to":"A","handle":131}
+{"ev":"rx","from":"A","text":"auto A#302","seq":1338441150,"rssi":-70}
+{"ev":"rx","from":"A","text":"auto A#303","seq":1338441151,"rssi":-70}
+{"ev":"sent","to":"A","handle":132}
+{"ev":"delivered","to":"A","handle":132}
+{"ev":"rx","from":"A","text":"auto A#304","seq":1338441152,"rssi":-70}
+{"ev":"sent","to":"A","handle":133}
+{"ev":"delivered","to":"A","handle":133}
+{"ev":"rx","from":"A","text":"auto A#305","seq":1338441153,"rssi":-70}
+{"ev":"sent","to":"A","handle":134}
+{"ev":"delivered","to":"A","handle":134}
+{"ev":"rx","from":"A","text":"auto A#306","seq":1338441154,"rssi":-71}
+{"ev":"sent","to":"A","handle":135}
+{"ev":"delivered","to":"A","handle":135}
+{"ev":"rx","from":"A","text":"auto A#307","seq":1338441155,"rssi":-73}
+{"ev":"sent","to":"A","handle":136}
+{"ev":"delivered","to":"A","handle":136}
+{"ev":"sent","to":"A","handle":137}
+{"ev":"rx","from":"A","text":"auto A#308","seq":1338441156,"rssi":-74}
+{"ev":"delivered","to":"A","handle":137}
+{"ev":"rx","from":"A","text":"auto A#309","seq":1338441157,"rssi":-73}
+{"ev":"sent","to":"A","handle":138}
+{"ev":"rx","from":"A","text":"auto A#310","seq":1338441158,"rssi":-72}
+{"ev":"sent","to":"A","handle":139}
+{"ev":"delivered","to":"A","handle":139}
+{"ev":"rx","from":"A","text":"auto A#311","seq":1338441159,"rssi":-73}
+{"ev":"sent","to":"A","handle":140}
+{"ev":"delivered","to":"A","handle":140}
+{"ev":"rx","from":"A","text":"auto A#312","seq":1338441160,"rssi":-74}
+{"ev":"sent","to":"A","handle":141}
+{"ev":"delivered","to":"A","handle":138}
+{"ev":"delivered","to":"A","handle":141}
+{"ev":"rx","from":"A","text":"auto A#313","seq":1338441161,"rssi":-68}
+{"ev":"sent","to":"A","handle":142}
+{"ev":"delivered","to":"A","handle":142}
+{"ev":"rx","from":"A","text":"auto A#314","seq":1338441162,"rssi":-71}
+{"ev":"sent","to":"A","handle":143}
+{"ev": "mark", "t": 1795202683.315, "note": "2 pans 1.5m/mark 2 pans 1.5m"}
+{"ev":"delivered","to":"A","handle":143}
+{"ev":"rx","from":"A","text":"auto A#315","seq":1338441163,"rssi":-70}
+{"ev":"sent","to":"A","handle":144}
+{"ev":"delivered","to":"A","handle":144}
+{"ev":"rx","from":"A","text":"auto A#316","seq":1338441164,"rssi":-71}
+{"ev":"sent","to":"A","handle":145}
+{"ev":"delivered","to":"A","handle":145}
+{"ev":"sent","to":"A","handle":146}
+{"ev":"sent","to":"A","handle":147}
+{"ev":"rx","from":"A","text":"auto A#318","seq":1338441166,"rssi":-72}
+{"ev":"rx","from":"A","text":"auto A#317","seq":1338441165,"rssi":-72}
+{"ev":"delivered","to":"A","handle":146}
+{"ev":"delivered","to":"A","handle":147}
+{"ev":"rx","from":"A","text":"auto A#319","seq":1338441167,"rssi":-71}
+{"ev":"sent","to":"A","handle":148}
+{"ev":"delivered","to":"A","handle":148}
+{"ev":"rx","from":"A","text":"auto A#320","seq":1338441168,"rssi":-70}
+{"ev":"sent","to":"A","handle":149}
+{"ev":"delivered","to":"A","handle":149}
+{"ev":"rx","from":"A","text":"auto A#321","seq":1338441169,"rssi":-70}
+{"ev":"sent","to":"A","handle":150}
+{"ev":"delivered","to":"A","handle":150}
+{"ev":"rx","from":"A","text":"auto A#322","seq":1338441170,"rssi":-71}
+{"ev":"sent","to":"A","handle":151}
+{"ev":"delivered","to":"A","handle":151}
+{"ev":"epoch","epoch":35629,"pseudo":"f4412258","mac_outage_us":5341}
+{"ev":"rx","from":"A","text":"auto A#323","seq":1338441171,"rssi":-71}
+{"ev":"sent","to":"A","handle":152}
+{"ev":"delivered","to":"A","handle":152}
+{"ev":"rx","from":"A","text":"auto A#324","seq":1338441172,"rssi":-71}
+{"ev":"sent","to":"A","handle":153}
+{"ev":"delivered","to":"A","handle":153}
+{"ev":"rx","from":"A","text":"auto A#325","seq":1338441173,"rssi":-71}
+{"ev":"sent","to":"A","handle":154}
+{"ev":"delivered","to":"A","handle":154}
+{"ev":"rx","from":"A","text":"auto A#326","seq":1338441174,"rssi":-71}
+{"ev":"sent","to":"A","handle":155}
+{"ev":"delivered","to":"A","handle":155}
+{"ev":"rx","from":"A","text":"auto A#327","seq":1338441175,"rssi":-71}
+{"ev":"sent","to":"A","handle":156}
+{"ev":"delivered","to":"A","handle":156}
+{"ev":"rx","from":"A","text":"auto A#328","seq":1338441176,"rssi":-71}
+{"ev":"sent","to":"A","handle":157}
+{"ev":"delivered","to":"A","handle":157}
+{"ev":"rx","from":"A","text":"auto A#329","seq":1338441177,"rssi":-71}
+{"ev":"sent","to":"A","handle":158}
+{"ev":"delivered","to":"A","handle":158}
+{"ev":"sent","to":"A","handle":159}
+{"ev":"delivered","to":"A","handle":159}
+{"ev":"rx","from":"A","text":"auto A#330","seq":1338441178,"rssi":-70}
+{"ev":"rx","from":"A","text":"auto A#331","seq":1338441179,"rssi":-70}
+{"ev":"sent","to":"A","handle":160}
+{"ev":"delivered","to":"A","handle":160}
+{"ev":"rx","from":"A","text":"auto A#332","seq":1338441180,"rssi":-69}
+{"ev":"sent","to":"A","handle":161}
+{"ev":"delivered","to":"A","handle":161}
+{"ev":"rx","from":"A","text":"auto A#333","seq":1338441181,"rssi":-70}
+{"ev":"sent","to":"A","handle":162}
+{"ev":"delivered","to":"A","handle":162}
+{"ev":"rx","from":"A","text":"auto A#334","seq":1338441182,"rssi":-70}
+{"ev":"sent","to":"A","handle":163}
+{"ev":"delivered","to":"A","handle":163}
+{"ev":"rx","from":"A","text":"auto A#335","seq":1338441183,"rssi":-70}
+{"ev":"sent","to":"A","handle":164}
+{"ev":"delivered","to":"A","handle":164}
+{"ev":"rx","from":"A","text":"auto A#336","seq":1338441184,"rssi":-71}
+{"ev":"sent","to":"A","handle":165}
+{"ev":"delivered","to":"A","handle":165}
+{"ev":"rx","from":"A","text":"auto A#337","seq":1338441185,"rssi":-70}
+{"ev":"sent","to":"A","handle":166}
+{"ev":"delivered","to":"A","handle":166}
+{"ev":"rx","from":"A","text":"auto A#338","seq":1338441186,"rssi":-70}
+{"ev":"sent","to":"A","handle":167}
+{"ev":"delivered","to":"A","handle":167}
+{"ev":"rx","from":"A","text":"auto A#339","seq":1338441187,"rssi":-71}
+{"ev":"sent","to":"A","handle":168}
+{"ev":"delivered","to":"A","handle":168}
+{"ev":"rx","from":"A","text":"auto A#340","seq":1338441188,"rssi":-71}
+{"ev":"sent","to":"A","handle":169}
+{"ev":"delivered","to":"A","handle":169}
+{"ev":"sent","to":"A","handle":170}
+{"ev":"delivered","to":"A","handle":170}
+{"ev":"rx","from":"A","text":"auto A#341","seq":1338441189,"rssi":-70}
+{"ev":"sent","to":"A","handle":171}
+{"ev":"delivered","to":"A","handle":171}
+{"ev":"rx","from":"A","text":"auto A#342","seq":1338441190,"rssi":-70}
+{"ev":"rx","from":"A","text":"auto A#343","seq":1338441191,"rssi":-70}
+{"ev":"sent","to":"A","handle":172}
+{"ev":"delivered","to":"A","handle":172}
+{"ev":"rx","from":"A","text":"auto A#344","seq":1338441192,"rssi":-70}
+{"ev":"sent","to":"A","handle":173}
+{"ev":"delivered","to":"A","handle":173}
+{"ev":"rx","from":"A","text":"auto A#345","seq":1338441193,"rssi":-70}
+{"ev":"sent","to":"A","handle":174}
+{"ev":"delivered","to":"A","handle":174}
+{"ev":"rx","from":"A","text":"auto A#346","seq":1338441194,"rssi":-70}
+{"ev":"sent","to":"A","handle":175}
+{"ev":"delivered","to":"A","handle":175}
+{"ev":"sent","to":"A","handle":176}
+{"ev":"rx","from":"A","text":"auto A#347","seq":1338441195,"rssi":-70}
+{"ev":"delivered","to":"A","handle":176}
+{"ev":"rx","from":"A","text":"auto A#348","seq":1338441196,"rssi":-70}
+{"ev":"sent","to":"A","handle":177}
+{"ev":"delivered","to":"A","handle":177}
+{"ev":"rx","from":"A","text":"auto A#349","seq":1338441197,"rssi":-70}
+{"ev":"sent","to":"A","handle":178}
+{"ev":"delivered","to":"A","handle":178}
+{"ev":"rx","from":"A","text":"auto A#350","seq":1338441198,"rssi":-70}
+{"ev":"sent","to":"A","handle":179}
+{"ev":"delivered","to":"A","handle":179}
+{"ev":"rx","from":"A","text":"auto A#351","seq":1338441199,"rssi":-70}
+{"ev":"sent","to":"A","handle":180}
+{"ev":"delivered","to":"A","handle":180}
+{"ev":"rx","from":"A","text":"auto A#352","seq":1338441200,"rssi":-70}
+{"ev":"sent","to":"A","handle":181}
+{"ev":"epoch","epoch":35630,"pseudo":"ea9f0d5c","mac_outage_us":5336}
+{"ev":"delivered","to":"A","handle":181}
+{"ev":"rx","from":"A","text":"auto A#353","seq":1338441201,"rssi":-70}
+{"ev":"sent","to":"A","handle":182}
+{"ev":"delivered","to":"A","handle":182}
+{"ev":"rx","from":"A","text":"auto A#354","seq":1338441202,"rssi":-70}
+{"ev":"sent","to":"A","handle":183}
+{"ev":"delivered","to":"A","handle":183}
+{"ev":"sent","to":"A","handle":184}
+{"ev":"rx","from":"A","text":"auto A#355","seq":1338441203,"rssi":-70}
+{"ev":"delivered","to":"A","handle":184}
+{"ev":"rx","from":"A","text":"auto A#356","seq":1338441204,"rssi":-70}
+{"ev":"sent","to":"A","handle":185}
+{"ev":"delivered","to":"A","handle":185}
+{"ev":"rx","from":"A","text":"auto A#357","seq":1338441205,"rssi":-70}
+{"ev":"sent","to":"A","handle":186}
+{"ev":"delivered","to":"A","handle":186}
+{"ev":"sent","to":"A","handle":187}
+{"ev":"rx","from":"A","text":"auto A#358","seq":1338441206,"rssi":-70}
+{"ev":"delivered","to":"A","handle":187}
+{"ev":"rx","from":"A","text":"auto A#359","seq":1338441207,"rssi":-70}
+{"ev":"sent","to":"A","handle":188}
+{"ev":"delivered","to":"A","handle":188}
+{"ev":"rx","from":"A","text":"auto A#360","seq":1338441208,"rssi":-70}
+{"ev":"sent","to":"A","handle":189}
+{"ev":"delivered","to":"A","handle":189}
+{"ev":"rx","from":"A","text":"auto A#361","seq":1338441209,"rssi":-70}
+{"ev":"sent","to":"A","handle":190}
+{"ev":"delivered","to":"A","handle":190}
+{"ev":"rx","from":"A","text":"auto A#362","seq":1338441210,"rssi":-70}
+{"ev":"sent","to":"A","handle":191}
+{"ev":"delivered","to":"A","handle":191}
+{"ev":"rx","from":"A","text":"auto A#363","seq":1338441211,"rssi":-70}
+{"ev":"sent","to":"A","handle":192}
+{"ev":"delivered","to":"A","handle":192}
+{"ev":"rx","from":"A","text":"auto A#364","seq":1338441212,"rssi":-70}
+{"ev":"sent","to":"A","handle":193}
+{"ev":"delivered","to":"A","handle":193}
+{"ev":"rx","from":"A","text":"auto A#365","seq":1338441213,"rssi":-70}
+{"ev":"sent","to":"A","handle":194}
+{"ev":"delivered","to":"A","handle":194}
+{"ev":"rx","from":"A","text":"auto A#366","seq":1338441214,"rssi":-70}
+{"ev":"sent","to":"A","handle":195}
+{"ev":"delivered","to":"A","handle":195}
+{"ev":"rx","from":"A","text":"auto A#367","seq":1338441215,"rssi":-70}
+{"ev":"sent","to":"A","handle":196}
+{"ev":"delivered","to":"A","handle":196}
+{"ev":"sent","to":"A","handle":197}
+{"ev":"delivered","to":"A","handle":197}
+{"ev":"rx","from":"A","text":"auto A#369","seq":1338441217,"rssi":-70}
+{"ev":"sent","to":"A","handle":198}
+{"ev":"rx","from":"A","text":"auto A#368","seq":1338441216,"rssi":-70}
+{"ev":"delivered","to":"A","handle":198}
+{"ev":"rx","from":"A","text":"auto A#370","seq":1338441218,"rssi":-70}
+{"ev":"sent","to":"A","handle":199}
+{"ev":"delivered","to":"A","handle":199}
+{"ev":"rx","from":"A","text":"auto A#371","seq":1338441219,"rssi":-70}
+{"ev":"sent","to":"A","handle":200}
+{"ev":"delivered","to":"A","handle":200}
+{"ev":"rx","from":"A","text":"auto A#372","seq":1338441220,"rssi":-70}
+{"ev":"sent","to":"A","handle":201}
+{"ev":"delivered","to":"A","handle":201}
+{"ev":"sent","to":"A","handle":202}
+{"ev":"delivered","to":"A","handle":202}
+{"ev":"rx","from":"A","text":"auto A#373","seq":1338441221,"rssi":-70}
+{"ev":"rx","from":"A","text":"auto A#374","seq":1338441222,"rssi":-70}
+{"ev":"sent","to":"A","handle":203}
+{"ev":"delivered","to":"A","handle":203}
+{"ev":"rx","from":"A","text":"auto A#375","seq":1338441223,"rssi":-70}
+{"ev":"sent","to":"A","handle":204}
+{"ev":"delivered","to":"A","handle":204}
+{"ev":"rx","from":"A","text":"auto A#376","seq":1338441224,"rssi":-70}
+{"ev":"sent","to":"A","handle":205}
+{"ev":"delivered","to":"A","handle":205}
+{"ev":"rx","from":"A","text":"auto A#377","seq":1338441225,"rssi":-70}
+{"ev":"sent","to":"A","handle":206}
+{"ev":"delivered","to":"A","handle":206}
+{"ev":"rx","from":"A","text":"auto A#378","seq":1338441226,"rssi":-70}
+{"ev":"sent","to":"A","handle":207}
+{"ev":"delivered","to":"A","handle":207}
+{"ev":"rx","from":"A","text":"auto A#379","seq":1338441227,"rssi":-70}
+{"ev":"sent","to":"A","handle":208}
+{"ev":"delivered","to":"A","handle":208}
+{"ev":"rx","from":"A","text":"auto A#380","seq":1338441228,"rssi":-70}
+{"ev":"sent","to":"A","handle":209}
+{"ev":"delivered","to":"A","handle":209}
+{"ev":"rx","from":"A","text":"auto A#381","seq":1338441229,"rssi":-70}
+{"ev":"sent","to":"A","handle":210}
+{"ev":"delivered","to":"A","handle":210}
+{"ev":"rx","from":"A","text":"auto A#382","seq":1338441230,"rssi":-70}
+{"ev":"sent","to":"A","handle":211}
+{"ev":"delivered","to":"A","handle":211}
+{"ev":"epoch","epoch":35631,"pseudo":"4e96a389","mac_outage_us":5340}
+{"ev":"rx","from":"A","text":"auto A#383","seq":1338441231,"rssi":-70}
+{"ev":"sent","to":"A","handle":212}
+{"ev":"delivered","to":"A","handle":212}
+{"ev":"rx","from":"A","text":"auto A#384","seq":1338441232,"rssi":-70}
+{"ev":"sent","to":"A","handle":213}
+{"ev":"delivered","to":"A","handle":213}
+{"ev":"rx","from":"A","text":"auto A#385","seq":1338441233,"rssi":-70}
+{"ev":"sent","to":"A","handle":214}
+{"ev":"delivered","to":"A","handle":214}
+{"ev":"rx","from":"A","text":"auto A#386","seq":1338441234,"rssi":-70}
+{"ev":"sent","to":"A","handle":215}
+{"ev":"delivered","to":"A","handle":215}
+{"ev":"rx","from":"A","text":"auto A#387","seq":1338441235,"rssi":-70}
+{"ev":"sent","to":"A","handle":216}
+{"ev":"delivered","to":"A","handle":216}
+{"ev":"rx","from":"A","text":"auto A#388","seq":1338441236,"rssi":-70}
+{"ev":"sent","to":"A","handle":217}
+{"ev":"delivered","to":"A","handle":217}
+{"ev":"rx","from":"A","text":"auto A#389","seq":1338441237,"rssi":-70}
+{"ev":"sent","to":"A","handle":218}
+{"ev":"delivered","to":"A","handle":218}
+{"ev":"sent","to":"A","handle":219}
+{"ev":"delivered","to":"A","handle":219}
+{"ev":"rx","from":"A","text":"auto A#390","seq":1338441238,"rssi":-70}
+{"ev":"sent","to":"A","handle":220}
+{"ev":"rx","from":"A","text":"auto A#391","seq":1338441239,"rssi":-70}
+{"ev":"rx","from":"A","text":"auto A#392","seq":1338441240,"rssi":-70}
+{"ev":"sent","to":"A","handle":221}
+{"ev":"delivered","to":"A","handle":221}
+{"ev":"delivered","to":"A","handle":220}
+{"ev":"rx","from":"A","text":"auto A#393","seq":1338441241,"rssi":-70}
+{"ev":"sent","to":"A","handle":222}
+{"ev":"delivered","to":"A","handle":222}
+{"ev":"rx","from":"A","text":"auto A#394","seq":1338441242,"rssi":-70}
+{"ev":"sent","to":"A","handle":223}
+{"ev":"delivered","to":"A","handle":223}
+{"ev":"rx","from":"A","text":"auto A#395","seq":1338441243,"rssi":-70}
+{"ev":"sent","to":"A","handle":224}
+{"ev":"delivered","to":"A","handle":224}
+{"ev":"rx","from":"A","text":"auto A#396","seq":1338441244,"rssi":-70}
+{"ev":"sent","to":"A","handle":225}
+{"ev":"delivered","to":"A","handle":225}
+{"ev":"rx","from":"A","text":"auto A#397","seq":1338441245,"rssi":-71}
+{"ev":"sent","to":"A","handle":226}
+{"ev":"delivered","to":"A","handle":226}
+{"ev":"rx","from":"A","text":"auto A#398","seq":1338441246,"rssi":-70}
+{"ev":"sent","to":"A","handle":227}
+{"ev":"delivered","to":"A","handle":227}
+{"ev":"sent","to":"A","handle":228}
+{"ev":"delivered","to":"A","handle":228}
+{"ev":"rx","from":"A","text":"auto A#399","seq":1338441247,"rssi":-69}
+{"ev":"rx","from":"A","text":"auto A#400","seq":1338441248,"rssi":-71}
+{"ev":"sent","to":"A","handle":229}
+{"ev":"delivered","to":"A","handle":229}
+{"ev":"rx","from":"A","text":"auto A#401","seq":1338441249,"rssi":-70}
+{"ev":"sent","to":"A","handle":230}
+{"ev":"delivered","to":"A","handle":230}
+{"ev":"rx","from":"A","text":"auto A#402","seq":1338441250,"rssi":-70}
+{"ev":"sent","to":"A","handle":231}
+{"ev":"delivered","to":"A","handle":231}
+{"ev":"rx","from":"A","text":"auto A#403","seq":1338441251,"rssi":-70}
+{"ev":"sent","to":"A","handle":232}
+{"ev":"delivered","to":"A","handle":232}
+{"ev":"rx","from":"A","text":"auto A#404","seq":1338441252,"rssi":-69}
+{"ev":"sent","to":"A","handle":233}
+{"ev":"delivered","to":"A","handle":233}
+{"ev":"rx","from":"A","text":"auto A#405","seq":1338441253,"rssi":-70}
+{"ev":"sent","to":"A","handle":234}
+{"ev":"delivered","to":"A","handle":234}
+{"ev":"rx","from":"A","text":"auto A#406","seq":1338441254,"rssi":-72}
+{"ev":"sent","to":"A","handle":235}
+{"ev":"delivered","to":"A","handle":235}
+{"ev":"rx","from":"A","text":"auto A#407","seq":1338441255,"rssi":-69}
+{"ev":"sent","to":"A","handle":236}
+{"ev":"delivered","to":"A","handle":236}
+{"ev":"rx","from":"A","text":"auto A#408","seq":1338441256,"rssi":-70}
+{"ev":"sent","to":"A","handle":237}
+{"ev":"delivered","to":"A","handle":237}
+{"ev":"rx","from":"A","text":"auto A#409","seq":1338441257,"rssi":-70}
+{"ev":"sent","to":"A","handle":238}
+{"ev":"delivered","to":"A","handle":238}
+{"ev":"rx","from":"A","text":"auto A#410","seq":1338441258,"rssi":-69}
+{"ev":"sent","to":"A","handle":239}
+{"ev":"delivered","to":"A","handle":239}
+{"ev":"rx","from":"A","text":"auto A#411","seq":1338441259,"rssi":-71}
+{"ev":"sent","to":"A","handle":240}
+{"ev":"delivered","to":"A","handle":240}
+{"ev":"rx","from":"A","text":"auto A#412","seq":1338441260,"rssi":-69}
+{"ev":"sent","to":"A","handle":241}
+{"ev":"delivered","to":"A","handle":241}
+{"ev":"epoch","epoch":35632,"pseudo":"a8f16cda","mac_outage_us":5350}
+{"ev":"rx","from":"A","text":"auto A#413","seq":1338441261,"rssi":-70}
+{"ev":"sent","to":"A","handle":242}
+{"ev":"delivered","to":"A","handle":242}
+{"ev":"rx","from":"A","text":"auto A#414","seq":1338441262,"rssi":-70}
+{"ev":"sent","to":"A","handle":243}
+{"ev":"delivered","to":"A","handle":243}
+{"ev":"rx","from":"A","text":"auto A#415","seq":1338441263,"rssi":-70}
+{"ev":"sent","to":"A","handle":244}
+{"ev":"delivered","to":"A","handle":244}
+{"ev":"sent","to":"A","handle":245}
+{"ev":"delivered","to":"A","handle":245}
+{"ev":"rx","from":"A","text":"auto A#417","seq":1338441265,"rssi":-69}
+{"ev":"sent","to":"A","handle":246}
+{"ev":"delivered","to":"A","handle":246}
+{"ev":"rx","from":"A","text":"auto A#416","seq":1338441264,"rssi":-70}
+{"ev":"rx","from":"A","text":"auto A#418","seq":1338441266,"rssi":-71}
+{"ev":"sent","to":"A","handle":247}
+{"ev":"delivered","to":"A","handle":247}
+{"ev":"rx","from":"A","text":"auto A#419","seq":1338441267,"rssi":-70}
+{"ev":"sent","to":"A","handle":248}
+{"ev":"delivered","to":"A","handle":248}
+{"ev":"sent","to":"A","handle":249}
+{"ev":"delivered","to":"A","handle":249}
+{"ev":"rx","from":"A","text":"auto A#420","seq":1338441268,"rssi":-71}
+{"ev":"rx","from":"A","text":"auto A#421","seq":1338441269,"rssi":-69}
+{"ev":"sent","to":"A","handle":250}
+{"ev":"delivered","to":"A","handle":250}
+{"ev":"rx","from":"A","text":"auto A#422","seq":1338441270,"rssi":-70}
+{"ev":"sent","to":"A","handle":251}
+{"ev":"delivered","to":"A","handle":251}
+{"ev":"rx","from":"A","text":"auto A#423","seq":1338441271,"rssi":-70}
+{"ev":"sent","to":"A","handle":252}
+{"ev":"delivered","to":"A","handle":252}
+{"ev":"rx","from":"A","text":"auto A#424","seq":1338441272,"rssi":-73}
+{"ev":"sent","to":"A","handle":253}
+{"ev":"sent","to":"A","handle":254}
+{"ev":"delivered","to":"A","handle":254}
+{"ev":"rx","from":"A","text":"auto A#425","seq":1338441273,"rssi":-71}
+{"ev":"delivered","to":"A","handle":253}
+{"ev":"rx","from":"A","text":"auto A#426","seq":1338441274,"rssi":-74}
+{"ev":"sent","to":"A","handle":255}
+{"ev":"delivered","to":"A","handle":255}
+{"ev":"rx","from":"A","text":"auto A#427","seq":1338441275,"rssi":-73}
+{"ev":"sent","to":"A","handle":256}
+{"ev":"delivered","to":"A","handle":256}
+{"ev":"rx","from":"A","text":"auto A#428","seq":1338441276,"rssi":-73}
+{"ev":"sent","to":"A","handle":257}
+{"ev":"delivered","to":"A","handle":257}
+{"ev": "mark", "t": 1795202912.326, "note": "2 pans + water bottles 1.5m/mark 2 pans + water bottles 1.5m"}
+{"ev":"rx","from":"A","text":"auto A#429","seq":1338441277,"rssi":-74}
+{"ev":"sent","to":"A","handle":258}
+{"ev":"delivered","to":"A","handle":258}
+{"ev":"rx","from":"A","text":"auto A#430","seq":1338441278,"rssi":-71}
+{"ev":"sent","to":"A","handle":259}
+{"ev":"delivered","to":"A","handle":259}
+{"ev":"rx","from":"A","text":"auto A#431","seq":1338441279,"rssi":-71}
+{"ev":"sent","to":"A","handle":260}
+{"ev":"delivered","to":"A","handle":260}
+{"ev":"rx","from":"A","text":"auto A#432","seq":1338441280,"rssi":-71}
+{"ev":"sent","to":"A","handle":261}
+{"ev":"delivered","to":"A","handle":261}
+{"ev":"rx","from":"A","text":"auto A#433","seq":1338441281,"rssi":-73}
+{"ev":"sent","to":"A","handle":262}
+{"ev":"delivered","to":"A","handle":262}
+{"ev":"rx","from":"A","text":"auto A#434","seq":1338441282,"rssi":-75}
+{"ev":"sent","to":"A","handle":263}
+{"ev":"delivered","to":"A","handle":263}
+{"ev":"rx","from":"A","text":"auto A#435","seq":1338441283,"rssi":-73}
+{"ev":"sent","to":"A","handle":264}
+{"ev":"delivered","to":"A","handle":264}
+{"ev":"rx","from":"A","text":"auto A#436","seq":1338441284,"rssi":-73}
+{"ev":"sent","to":"A","handle":265}
+{"ev":"delivered","to":"A","handle":265}
+{"ev":"rx","from":"A","text":"auto A#437","seq":1338441285,"rssi":-74}
+{"ev":"sent","to":"A","handle":266}
+{"ev":"delivered","to":"A","handle":266}
+{"ev":"rx","from":"A","text":"auto A#438","seq":1338441286,"rssi":-74}
+{"ev":"sent","to":"A","handle":267}
+{"ev":"rx","from":"A","text":"auto A#439","seq":1338441287,"rssi":-74}
+{"ev":"sent","to":"A","handle":268}
+{"ev":"delivered","to":"A","handle":268}
+{"ev":"delivered","to":"A","handle":267}
+{"ev":"rx","from":"A","text":"auto A#440","seq":1338441288,"rssi":-74}
+{"ev":"sent","to":"A","handle":269}
+{"ev":"delivered","to":"A","handle":269}
+{"ev":"rx","from":"A","text":"auto A#441","seq":1338441289,"rssi":-74}
+{"ev":"sent","to":"A","handle":270}
+{"ev":"delivered","to":"A","handle":270}
+{"ev":"rx","from":"A","text":"auto A#442","seq":1338441290,"rssi":-73}
+{"ev":"sent","to":"A","handle":271}
+{"ev":"delivered","to":"A","handle":271}
+{"ev":"epoch","epoch":35633,"pseudo":"71a46265","mac_outage_us":5419}
+{"ev":"rx","from":"A","text":"auto A#443","seq":1338441291,"rssi":-74}
+{"ev":"sent","to":"A","handle":272}
+{"ev":"delivered","to":"A","handle":272}
+{"ev":"rx","from":"A","text":"auto A#444","seq":1338441292,"rssi":-73}
+{"ev":"sent","to":"A","handle":273}
+{"ev":"delivered","to":"A","handle":273}
+{"ev":"rx","from":"A","text":"auto A#445","seq":1338441293,"rssi":-73}
+{"ev":"sent","to":"A","handle":274}
+{"ev":"delivered","to":"A","handle":274}
+{"ev":"rx","from":"A","text":"auto A#446","seq":1338441294,"rssi":-74}
+{"ev":"sent","to":"A","handle":275}
+{"ev":"delivered","to":"A","handle":275}
+{"ev":"rx","from":"A","text":"auto A#447","seq":1338441295,"rssi":-73}
+{"ev":"sent","to":"A","handle":276}
+{"ev":"delivered","to":"A","handle":276}
+{"ev":"rx","from":"A","text":"auto A#448","seq":1338441296,"rssi":-72}
+{"ev":"sent","to":"A","handle":277}
+{"ev":"delivered","to":"A","handle":277}
+{"ev":"rx","from":"A","text":"auto A#449","seq":1338441297,"rssi":-72}
+{"ev":"sent","to":"A","handle":278}
+{"ev":"delivered","to":"A","handle":278}
+{"ev":"rx","from":"A","text":"auto A#450","seq":1338441298,"rssi":-73}
+{"ev":"sent","to":"A","handle":279}
+{"ev":"delivered","to":"A","handle":279}
+{"ev":"sent","to":"A","handle":280}
+{"ev":"delivered","to":"A","handle":280}
+{"ev":"rx","from":"A","text":"auto A#451","seq":1338441299,"rssi":-72}
+{"ev":"sent","to":"A","handle":281}
+{"ev":"delivered","to":"A","handle":281}
+{"ev":"rx","from":"A","text":"auto A#452","seq":1338441300,"rssi":-72}
+{"ev":"rx","from":"A","text":"auto A#453","seq":1338441301,"rssi":-72}
+{"ev":"sent","to":"A","handle":282}
+{"ev":"delivered","to":"A","handle":282}
+{"ev":"rx","from":"A","text":"auto A#454","seq":1338441302,"rssi":-71}
+{"ev":"sent","to":"A","handle":283}
+{"ev":"delivered","to":"A","handle":283}
+{"ev":"rx","from":"A","text":"auto A#455","seq":1338441303,"rssi":-72}
+{"ev":"sent","to":"A","handle":284}
+{"ev":"rx","from":"A","text":"auto A#456","seq":1338441304,"rssi":-71}
+{"ev":"sent","to":"A","handle":285}
+{"ev":"delivered","to":"A","handle":284}
+{"ev":"rx","from":"A","text":"auto A#457","seq":1338441305,"rssi":-73}
+{"ev":"sent","to":"A","handle":286}
+{"ev":"delivered","to":"A","handle":286}
+{"ev":"rx","from":"A","text":"auto A#458","seq":1338441306,"rssi":-72}
+{"ev":"sent","to":"A","handle":287}
+{"ev":"delivered","to":"A","handle":287}
+{"ev":"sent","to":"A","handle":288}
+{"ev":"delivered","to":"A","handle":288}
+{"ev":"delivered","to":"A","handle":285}
+{"ev":"rx","from":"A","text":"auto A#460","seq":1338441308,"rssi":-72}
+{"ev":"sent","to":"A","handle":289}
+{"ev":"delivered","to":"A","handle":289}
+{"ev":"rx","from":"A","text":"auto A#459","seq":1338441307,"rssi":-71}
+{"ev":"rx","from":"A","text":"auto A#461","seq":1338441309,"rssi":-71}
+{"ev":"sent","to":"A","handle":290}
+{"ev":"delivered","to":"A","handle":290}
+{"ev":"sent","to":"A","handle":291}
+{"ev":"delivered","to":"A","handle":291}
+{"ev":"rx","from":"A","text":"auto A#462","seq":1338441310,"rssi":-73}
+{"ev":"rx","from":"A","text":"auto A#463","seq":1338441311,"rssi":-72}
+{"ev":"sent","to":"A","handle":292}
+{"ev":"delivered","to":"A","handle":292}
+{"ev":"rx","from":"A","text":"auto A#464","seq":1338441312,"rssi":-72}
+{"ev":"sent","to":"A","handle":293}
+{"ev":"delivered","to":"A","handle":293}
+{"ev":"rx","from":"A","text":"auto A#465","seq":1338441313,"rssi":-73}
+{"ev":"sent","to":"A","handle":294}
+{"ev":"delivered","to":"A","handle":294}
+{"ev":"rx","from":"A","text":"auto A#466","seq":1338441314,"rssi":-71}
+{"ev":"sent","to":"A","handle":295}
+{"ev":"delivered","to":"A","handle":295}
+{"ev":"rx","from":"A","text":"auto A#467","seq":1338441315,"rssi":-72}
+{"ev":"sent","to":"A","handle":296}
+{"ev":"delivered","to":"A","handle":296}
+{"ev":"rx","from":"A","text":"auto A#468","seq":1338441316,"rssi":-73}
+{"ev":"sent","to":"A","handle":297}
+{"ev":"delivered","to":"A","handle":297}
+{"ev":"sent","to":"A","handle":298}
+{"ev":"rx","from":"A","text":"auto A#469","seq":1338441317,"rssi":-71}
+{"ev":"delivered","to":"A","handle":298}
+{"ev":"rx","from":"A","text":"auto A#470","seq":1338441318,"rssi":-72}
+{"ev":"sent","to":"A","handle":299}
+{"ev":"delivered","to":"A","handle":299}
+{"ev":"rx","from":"A","text":"auto A#471","seq":1338441319,"rssi":-74}
+{"ev":"sent","to":"A","handle":300}
+{"ev":"delivered","to":"A","handle":300}
+{"ev":"rx","from":"A","text":"auto A#472","seq":1338441320,"rssi":-73}
+{"ev":"sent","to":"A","handle":301}
+{"ev":"delivered","to":"A","handle":301}
+{"ev":"epoch","epoch":35634,"pseudo":"4709e43c","mac_outage_us":5353}
+{"ev":"rx","from":"A","text":"auto A#473","seq":1338441321,"rssi":-74}
+{"ev":"sent","to":"A","handle":302}
+{"ev":"delivered","to":"A","handle":302}
+{"ev":"sent","to":"A","handle":303}
+{"ev":"delivered","to":"A","handle":303}
+{"ev":"rx","from":"A","text":"auto A#474","seq":1338441322,"rssi":-76}
+{"ev":"rx","from":"A","text":"auto A#475","seq":1338441323,"rssi":-78}
+{"ev":"sent","to":"A","handle":304}
+{"ev":"delivered","to":"A","handle":304}
+{"ev":"rx","from":"A","text":"auto A#476","seq":1338441324,"rssi":-76}
+{"ev":"sent","to":"A","handle":305}
+{"ev":"delivered","to":"A","handle":305}
+{"ev":"rx","from":"A","text":"auto A#477","seq":1338441325,"rssi":-71}
+{"ev":"sent","to":"A","handle":306}
+{"ev":"delivered","to":"A","handle":306}
+{"ev":"rx","from":"A","text":"auto A#478","seq":1338441326,"rssi":-75}
+{"ev":"sent","to":"A","handle":307}
+{"ev": "mark", "t": 1795203011.723, "note": "2 pans + water bottles + back pack 1.5m"}
+{"ev":"delivered","to":"A","handle":307}
+{"ev":"sent","to":"A","handle":308}
+{"ev":"delivered","to":"A","handle":308}
+{"ev":"rx","from":"A","text":"auto A#479","seq":1338441327,"rssi":-73}
+{"ev":"rx","from":"A","text":"auto A#480","seq":1338441328,"rssi":-77}
+{"ev":"sent","to":"A","handle":309}
+{"ev":"delivered","to":"A","handle":309}
+{"ev":"rx","from":"A","text":"auto A#481","seq":1338441329,"rssi":-77}
+{"ev":"sent","to":"A","handle":310}
+{"ev":"delivered","to":"A","handle":310}
+{"ev":"sent","to":"A","handle":311}
+{"ev":"delivered","to":"A","handle":311}
+{"ev":"rx","from":"A","text":"auto A#482","seq":1338441330,"rssi":-78}
+{"ev":"sent","to":"A","handle":312}
+{"ev":"delivered","to":"A","handle":312}
+{"ev":"rx","from":"A","text":"auto A#483","seq":1338441331,"rssi":-75}
+{"ev":"rx","from":"A","text":"auto A#484","seq":1338441332,"rssi":-74}
+{"ev":"sent","to":"A","handle":313}
+{"ev":"delivered","to":"A","handle":313}
+{"ev":"rx","from":"A","text":"auto A#485","seq":1338441333,"rssi":-74}
+{"ev":"sent","to":"A","handle":314}
+{"ev":"delivered","to":"A","handle":314}
+{"ev":"sent","to":"A","handle":315}
+{"ev":"delivered","to":"A","handle":315}
+{"ev":"rx","from":"A","text":"auto A#486","seq":1338441334,"rssi":-73}
+{"ev":"rx","from":"A","text":"auto A#487","seq":1338441335,"rssi":-72}
+{"ev":"sent","to":"A","handle":316}
+{"ev":"delivered","to":"A","handle":316}
+{"ev":"rx","from":"A","text":"auto A#488","seq":1338441336,"rssi":-72}
+{"ev":"sent","to":"A","handle":317}
+{"ev":"delivered","to":"A","handle":317}
+{"ev":"rx","from":"A","text":"auto A#489","seq":1338441337,"rssi":-73}
+{"ev":"sent","to":"A","handle":318}
+{"ev":"rx","from":"A","text":"auto A#490","seq":1338441338,"rssi":-72}
+{"ev":"sent","to":"A","handle":319}
+{"ev":"delivered","to":"A","handle":319}
+{"ev":"delivered","to":"A","handle":318}
+{"ev":"rx","from":"A","text":"auto A#491","seq":1338441339,"rssi":-72}
+{"ev":"sent","to":"A","handle":320}
+{"ev":"delivered","to":"A","handle":320}
+{"ev":"rx","from":"A","text":"auto A#492","seq":1338441340,"rssi":-72}
+{"ev":"sent","to":"A","handle":321}
+{"ev":"delivered","to":"A","handle":321}
+{"ev":"rx","from":"A","text":"auto A#493","seq":1338441341,"rssi":-72}
+{"ev":"sent","to":"A","handle":322}
+{"ev":"delivered","to":"A","handle":322}
+{"ev":"rx","from":"A","text":"auto A#494","seq":1338441342,"rssi":-72}
+{"ev":"sent","to":"A","handle":323}
+{"ev":"delivered","to":"A","handle":323}
+{"ev":"rx","from":"A","text":"auto A#495","seq":1338441343,"rssi":-72}
+{"ev":"sent","to":"A","handle":324}
+{"ev":"delivered","to":"A","handle":324}
+{"ev":"rx","from":"A","text":"auto A#496","seq":1338441344,"rssi":-72}
+{"ev":"sent","to":"A","handle":325}
+{"ev":"delivered","to":"A","handle":325}
+{"ev":"sent","to":"A","handle":326}
+{"ev":"delivered","to":"A","handle":326}
+{"ev":"rx","from":"A","text":"auto A#497","seq":1338441345,"rssi":-72}
+{"ev":"rx","from":"A","text":"auto A#498","seq":1338441346,"rssi":-72}
+{"ev":"sent","to":"A","handle":327}
+{"ev":"delivered","to":"A","handle":327}
+{"ev":"rx","from":"A","text":"auto A#499","seq":1338441347,"rssi":-72}
+{"ev":"sent","to":"A","handle":328}
+{"ev":"delivered","to":"A","handle":328}
+{"ev":"rx","from":"A","text":"auto A#500","seq":1338441348,"rssi":-72}
+{"ev":"sent","to":"A","handle":329}
+{"ev":"delivered","to":"A","handle":329}
+{"ev":"rx","from":"A","text":"auto A#501","seq":1338441349,"rssi":-72}
+{"ev":"sent","to":"A","handle":330}
+{"ev":"delivered","to":"A","handle":330}
+{"ev":"rx","from":"A","text":"auto A#502","seq":1338441350,"rssi":-72}
+{"ev":"sent","to":"A","handle":331}
+{"ev":"delivered","to":"A","handle":331}
+{"ev":"epoch","epoch":35635,"pseudo":"c461ccb9","mac_outage_us":5331}
+{"ev":"rx","from":"A","text":"auto A#503","seq":1338441351,"rssi":-72}
+{"ev":"sent","to":"A","handle":332}
+{"ev":"delivered","to":"A","handle":332}
+{"ev":"rx","from":"A","text":"auto A#504","seq":1338441352,"rssi":-72}
+{"ev":"sent","to":"A","handle":333}
+{"ev":"delivered","to":"A","handle":333}
+{"ev":"rx","from":"A","text":"auto A#505","seq":1338441353,"rssi":-72}
+{"ev":"sent","to":"A","handle":334}
+{"ev":"delivered","to":"A","handle":334}
+{"ev":"rx","from":"A","text":"auto A#506","seq":1338441354,"rssi":-72}
+{"ev":"sent","to":"A","handle":335}
+{"ev":"delivered","to":"A","handle":335}
+{"ev":"rx","from":"A","text":"auto A#507","seq":1338441355,"rssi":-73}
+{"ev":"sent","to":"A","handle":336}
+{"ev":"delivered","to":"A","handle":336}
+{"ev":"sent","to":"A","handle":337}
+{"ev":"delivered","to":"A","handle":337}
+{"ev":"rx","from":"A","text":"auto A#509","seq":1338441357,"rssi":-72}
+{"ev":"sent","to":"A","handle":338}
+{"ev":"delivered","to":"A","handle":338}
+{"ev":"sent","to":"A","handle":339}
+{"ev":"delivered","to":"A","handle":339}
+{"ev":"rx","from":"A","text":"auto A#511","seq":1338441359,"rssi":-73}
+{"ev":"sent","to":"A","handle":340}
+{"ev":"rx","from":"A","text":"auto A#510","seq":1338441358,"rssi":-73}
+{"ev":"delivered","to":"A","handle":340}
+{"ev":"rx","from":"A","text":"auto A#512","seq":1338441360,"rssi":-72}
+{"ev":"sent","to":"A","handle":341}
+{"ev":"delivered","to":"A","handle":341}
+{"ev":"rx","from":"A","text":"auto A#513","seq":1338441361,"rssi":-72}
+{"ev":"sent","to":"A","handle":342}
+{"ev":"delivered","to":"A","handle":342}
+{"ev":"rx","from":"A","text":"auto A#514","seq":1338441362,"rssi":-73}
+{"ev":"sent","to":"A","handle":343}
+{"ev":"delivered","to":"A","handle":343}
+{"ev":"rx","from":"A","text":"auto A#515","seq":1338441363,"rssi":-72}
+{"ev":"status","name":"C","synced":true,"mesh_ms":1795203268025,"epoch":35638,"pseudo":"38eeca64","rx":73,"tx":66,"keys_sent":3,"beacons":3,"delivered":14,"acked":11,"failed":0,"relayed":29,"dup":24,"cancelled":0,"bad_link_tag":0,"bad_epoch":18,"blocked":0,"not_synced":1,"stale":0,"rate_limited":0,"gate_drops":0,"allow_drops":0,"queued":0,"mac_outage_us":5338}
+{"ev":"radio","airtime_avg_us":3099,"rx_overflow":0,"tx_fail":0,"free_heap":144268,"rotate_mac":true,"rssi_gate":-127,"allow_n":0,"auto_to":"A","auto_every_s":2}
+{"ev":"sent","to":"A","handle":12}
+{"ev":"delivered","to":"A","handle":12}
+{"ev":"rx","from":"A","text":"auto A#607","seq":1338441455,"rssi":-74}
+{"ev":"sent","to":"A","handle":13}
+{"ev":"delivered","to":"A","handle":13}
+{"ev":"rx","from":"A","text":"auto A#608","seq":1338441456,"rssi":-74}
+{"ev":"sent","to":"A","handle":14}
+{"ev":"delivered","to":"A","handle":14}
+{"ev":"rx","from":"A","text":"auto A#609","seq":1338441457,"rssi":-73}
+{"ev":"sent","to":"A","handle":15}
+{"ev":"delivered","to":"A","handle":15}
+{"ev":"rx","from":"A","text":"auto A#610","seq":1338441458,"rssi":-74}
+{"ev":"sent","to":"A","handle":16}
+{"ev":"delivered","to":"A","handle":16}
+{"ev":"rx","from":"A","text":"auto A#611","seq":1338441459,"rssi":-74}
+{"ev":"sent","to":"A","handle":17}
+{"ev":"rx","from":"A","text":"auto A#612","seq":1338441460,"rssi":-74}
+{"ev":"delivered","to":"A","handle":17}
+{"ev":"sent","to":"A","handle":18}
+{"ev":"rx","from":"A","text":"auto A#613","seq":1338441461,"rssi":-73}
+{"ev":"delivered","to":"A","handle":18}
+{"ev":"sent","to":"A","handle":19}
+{"ev":"delivered","to":"A","handle":19}
+{"ev":"rx","from":"A","text":"auto A#614","seq":1338441462,"rssi":-73}
+{"ev":"sent","to":"A","handle":20}
+{"ev":"delivered","to":"A","handle":20}
+{"ev":"rx","from":"A","text":"auto A#615","seq":1338441463,"rssi":-74}
+{"ev":"sent","to":"A","handle":21}
+{"ev":"rx","from":"A","text":"auto A#616","seq":1338441464,"rssi":-74}
+{"ev":"delivered","to":"A","handle":21}
+{"ev":"sent","to":"A","handle":22}
+{"ev":"delivered","to":"A","handle":22}
+{"ev":"rx","from":"A","text":"auto A#617","seq":1338441465,"rssi":-74}
+{"ev":"sent","to":"A","handle":23}
+{"ev":"delivered","to":"A","handle":23}
+{"ev":"rx","from":"A","text":"auto A#618","seq":1338441466,"rssi":-74}
+{"ev":"sent","to":"A","handle":24}
+{"ev":"delivered","to":"A","handle":24}
+{"ev":"rx","from":"A","text":"auto A#619","seq":1338441467,"rssi":-74}
+{"ev":"sent","to":"A","handle":25}
+{"ev":"rx","from":"A","text":"auto A#620","seq":1338441468,"rssi":-74}
+{"ev":"delivered","to":"A","handle":25}
+{"ev":"sent","to":"A","handle":26}
+{"ev":"delivered","to":"A","handle":26}
+{"ev":"rx","from":"A","text":"auto A#621","seq":1338441469,"rssi":-73}
+{"ev":"sent","to":"A","handle":27}
+{"ev":"delivered","to":"A","handle":27}
+{"ev":"rx","from":"A","text":"auto A#622","seq":1338441470,"rssi":-73}
+{"ev":"epoch","epoch":35639,"pseudo":"2c771f62","mac_outage_us":5355}
+{"ev": "mark", "t": 1795203300.371, "note": "Nothng 3-4m marking/mark Nothng 3-4m marking/mark Nothng 3-4m marking"}
+{"ev":"sent","to":"A","handle":28}
+{"ev":"delivered","to":"A","handle":28}
+{"ev":"rx","from":"A","text":"auto A#623","seq":1338441471,"rssi":-73}
+{"ev":"sent","to":"A","handle":29}
+{"ev":"rx","from":"A","text":"auto A#624","seq":1338441472,"rssi":-74}
+{"ev":"delivered","to":"A","handle":29}
+{"ev":"sent","to":"A","handle":30}
+{"ev":"rx","from":"A","text":"auto A#625","seq":1338441473,"rssi":-74}
+{"ev":"sent","to":"A","handle":31}
+{"ev":"delivered","to":"A","handle":30}
+{"ev":"rx","from":"A","text":"auto A#626","seq":1338441474,"rssi":-75}
+{"ev":"sent","to":"A","handle":32}
+{"ev":"delivered","to":"A","handle":32}
+{"ev":"rx","from":"A","text":"auto A#627","seq":1338441475,"rssi":-74}
+{"ev":"delivered","to":"A","handle":31}
+{"ev":"sent","to":"A","handle":33}
+{"ev":"delivered","to":"A","handle":33}
+{"ev":"rx","from":"A","text":"auto A#628","seq":1338441476,"rssi":-74}
+{"ev":"sent","to":"A","handle":34}
+{"ev":"delivered","to":"A","handle":34}
+{"ev":"rx","from":"A","text":"auto A#629","seq":1338441477,"rssi":-74}
+{"ev":"sent","to":"A","handle":35}
+{"ev":"rx","from":"A","text":"auto A#630","seq":1338441478,"rssi":-74}
+{"ev":"sent","to":"A","handle":36}
+{"ev":"delivered","to":"A","handle":35}
+{"ev":"rx","from":"A","text":"auto A#631","seq":1338441479,"rssi":-74}
+{"ev":"sent","to":"A","handle":37}
+{"ev":"delivered","to":"A","handle":36}
+{"ev":"sent","to":"A","handle":38}
+{"ev":"sent","to":"A","handle":39}
+{"ev":"delivered","to":"A","handle":39}
+{"ev":"sent","to":"A","handle":40}
+{"ev":"delivered","to":"A","handle":40}
+{"ev":"rx","from":"A","text":"auto A#635","seq":1338441483,"rssi":-74}
+{"ev":"rx","from":"A","text":"auto A#634","seq":1338441482,"rssi":-74}
+{"ev":"rx","from":"A","text":"auto A#632","seq":1338441480,"rssi":-74}
+{"ev":"sent","to":"A","handle":41}
+{"ev":"rx","from":"A","text":"auto A#636","seq":1338441484,"rssi":-72}
+{"ev":"delivered","to":"A","handle":41}
+{"ev":"delivered","to":"A","handle":38}
+{"ev":"rx","from":"A","text":"auto A#633","seq":1338441481,"rssi":-72}
+{"ev":"sent","to":"A","handle":42}
+{"ev":"delivered","to":"A","handle":42}
+{"ev":"rx","from":"A","text":"auto A#637","seq":1338441485,"rssi":-72}
+{"ev":"failed","to":"A","handle":37}
+{"ev":"sent","to":"A","handle":43}
+{"ev":"delivered","to":"A","handle":43}
+{"ev":"rx","from":"A","text":"auto A#638","seq":1338441486,"rssi":-73}
+{"ev":"sent","to":"A","handle":44}
+{"ev":"rx","from":"A","text":"auto A#639","seq":1338441487,"rssi":-73}
+{"ev":"delivered","to":"A","handle":44}
+{"ev":"sent","to":"A","handle":45}
+{"ev":"delivered","to":"A","handle":45}
+{"ev":"rx","from":"A","text":"auto A#640","seq":1338441488,"rssi":-71}
+{"ev":"sent","to":"A","handle":46}
+{"ev":"delivered","to":"A","handle":46}
+{"ev":"rx","from":"A","text":"auto A#641","seq":1338441489,"rssi":-72}
+{"ev":"sent","to":"A","handle":47}
+{"ev":"delivered","to":"A","handle":47}
+{"ev":"rx","from":"A","text":"auto A#642","seq":1338441490,"rssi":-75}
+{"ev":"sent","to":"A","handle":48}
+{"ev":"delivered","to":"A","handle":48}
+{"ev":"rx","from":"A","text":"auto A#643","seq":1338441491,"rssi":-75}
+{"ev":"sent","to":"A","handle":49}
+{"ev":"delivered","to":"A","handle":49}
+{"ev":"rx","from":"A","text":"auto A#644","seq":1338441492,"rssi":-78}
+{"ev":"sent","to":"A","handle":50}
+{"ev":"delivered","to":"A","handle":50}
+{"ev":"rx","from":"A","text":"auto A#645","seq":1338441493,"rssi":-73}
+{"ev":"sent","to":"A","handle":51}
+{"ev":"delivered","to":"A","handle":51}
+{"ev":"rx","from":"A","text":"auto A#646","seq":1338441494,"rssi":-74}
+{"ev":"sent","to":"A","handle":52}
+{"ev":"delivered","to":"A","handle":52}
+{"ev":"rx","from":"A","text":"auto A#647","seq":1338441495,"rssi":-75}
+{"ev":"sent","to":"A","handle":53}
+{"ev":"delivered","to":"A","handle":53}
+{"ev":"rx","from":"A","text":"auto A#648","seq":1338441496,"rssi":-74}
+{"ev":"sent","to":"A","handle":54}
+{"ev":"delivered","to":"A","handle":54}
+{"ev":"sent","to":"A","handle":55}
+{"ev":"delivered","to":"A","handle":55}
+{"ev":"rx","from":"A","text":"auto A#650","seq":1338441498,"rssi":-74}
+{"ev":"rx","from":"A","text":"auto A#649","seq":1338441497,"rssi":-73}
+{"ev":"sent","to":"A","handle":56}
+{"ev":"delivered","to":"A","handle":56}
+{"ev":"rx","from":"A","text":"auto A#651","seq":1338441499,"rssi":-73}
+{"ev":"sent","to":"A","handle":57}
+{"ev":"delivered","to":"A","handle":57}
+{"ev":"epoch","epoch":35640,"pseudo":"48bf30f5","mac_outage_us":5285}
+{"ev":"sent","to":"A","handle":58}
+{"ev":"delivered","to":"A","handle":58}
+{"ev":"rx","from":"A","text":"auto A#653","seq":1338441501,"rssi":-74}
+{"ev":"rx","from":"A","text":"auto A#652","seq":1338441500,"rssi":-74}
+{"ev":"sent","to":"A","handle":59}
+{"ev":"delivered","to":"A","handle":59}
+{"ev":"rx","from":"A","text":"auto A#654","seq":1338441502,"rssi":-72}
+{"ev":"sent","to":"A","handle":60}
+{"ev":"rx","from":"A","text":"auto A#655","seq":1338441503,"rssi":-75}
+{"ev":"sent","to":"A","handle":61}
+{"ev":"rx","from":"A","text":"auto A#656","seq":1338441504,"rssi":-76}
+{"ev":"delivered","to":"A","handle":60}
+{"ev":"delivered","to":"A","handle":61}
+{"ev":"sent","to":"A","handle":62}
+{"ev":"delivered","to":"A","handle":62}
+{"ev":"rx","from":"A","text":"auto A#657","seq":1338441505,"rssi":-76}
+{"ev":"sent","to":"A","handle":63}
+{"ev":"delivered","to":"A","handle":63}
+{"ev":"rx","from":"A","text":"auto A#658","seq":1338441506,"rssi":-80}
+{"ev":"sent","to":"A","handle":64}
+{"ev":"delivered","to":"A","handle":64}
+{"ev":"rx","from":"A","text":"auto A#659","seq":1338441507,"rssi":-77}
+{"ev":"sent","to":"A","handle":65}
+{"ev":"delivered","to":"A","handle":65}
+{"ev":"rx","from":"A","text":"auto A#660","seq":1338441508,"rssi":-75}
+{"ev":"sent","to":"A","handle":66}
+{"ev":"rx","from":"A","text":"auto A#661","seq":1338441509,"rssi":-75}
+{"ev":"delivered","to":"A","handle":66}
+{"ev":"sent","to":"A","handle":67}
+{"ev":"delivered","to":"A","handle":67}
+{"ev":"rx","from":"A","text":"auto A#662","seq":1338441510,"rssi":-75}
+{"ev":"sent","to":"A","handle":68}
+{"ev":"delivered","to":"A","handle":68}
+{"ev":"rx","from":"A","text":"auto A#663","seq":1338441511,"rssi":-75}
+{"ev":"sent","to":"A","handle":69}
+{"ev":"delivered","to":"A","handle":69}
+{"ev":"rx","from":"A","text":"auto A#664","seq":1338441512,"rssi":-75}
+{"ev":"sent","to":"A","handle":70}
+{"ev":"delivered","to":"A","handle":70}
+{"ev":"rx","from":"A","text":"auto A#665","seq":1338441513,"rssi":-73}
+{"ev":"sent","to":"A","handle":71}
+{"ev":"delivered","to":"A","handle":71}
+{"ev":"rx","from":"A","text":"auto A#666","seq":1338441514,"rssi":-72}
+{"ev":"sent","to":"A","handle":72}
+{"ev":"rx","from":"A","text":"auto A#667","seq":1338441515,"rssi":-78}
+{"ev":"sent","to":"A","handle":73}
+{"ev":"delivered","to":"A","handle":73}
+{"ev":"rx","from":"A","text":"auto A#668","seq":1338441516,"rssi":-77}
+{"ev":"delivered","to":"A","handle":72}
+{"ev":"sent","to":"A","handle":74}
+{"ev":"delivered","to":"A","handle":74}
+{"ev":"rx","from":"A","text":"auto A#669","seq":1338441517,"rssi":-77}
+{"ev":"sent","to":"A","handle":75}
+{"ev":"rx","from":"A","text":"auto A#670","seq":1338441518,"rssi":-75}
+{"ev":"delivered","to":"A","handle":75}
+{"ev":"sent","to":"A","handle":76}
+{"ev":"delivered","to":"A","handle":76}
+{"ev":"rx","from":"A","text":"auto A#671","seq":1338441519,"rssi":-76}
+{"ev":"sent","to":"A","handle":77}
+{"ev":"delivered","to":"A","handle":77}
+{"ev":"rx","from":"A","text":"auto A#672","seq":1338441520,"rssi":-74}
+{"ev":"sent","to":"A","handle":78}
+{"ev":"rx","from":"A","text":"auto A#673","seq":1338441521,"rssi":-77}
+{"ev":"sent","to":"A","handle":79}
+{"ev":"sent","to":"A","handle":80}
+{"ev":"sent","to":"A","handle":81}
+{"ev":"sent","to":"A","handle":82}
+{"ev":"sent","to":"A","handle":83}
+{"ev":"failed","to":"A","handle":78}
+{"ev":"sent","to":"A","handle":84}
+{"ev":"failed","to":"A","handle":79}
+{"ev":"sent","to":"A","handle":85}
+{"ev":"failed","to":"A","handle":80}
+{"ev":"delivered","to":"A","handle":84}
+{"ev":"rx","from":"A","text":"auto A#679","seq":1338441527,"rssi":-72}
+{"ev":"sent","to":"A","handle":86}
+{"ev":"failed","to":"A","handle":81}
+{"ev":"rx","from":"A","text":"auto A#680","seq":1338441528,"rssi":-73}
+{"ev":"sent","to":"A","handle":87}
+{"ev":"delivered","to":"A","handle":87}
+{"ev":"failed","to":"A","handle":82}
+{"ev":"delivered","to":"A","handle":86}
+{"ev":"epoch","epoch":35641,"pseudo":"48a92af3","mac_outage_us":5364}
+{"ev":"sent","to":"A","handle":88}
+{"ev":"failed","to":"A","handle":83}
+{"ev":"sent","to":"A","handle":89}
+{"ev":"rx","from":"A","text":"auto A#684","seq":1338441532,"rssi":-77}
+{"ev":"sent","to":"A","handle":90}
+{"ev":"failed","to":"A","handle":85}
+{"ev":"rx","from":"A","text":"auto A#682","seq":1338441530,"rssi":-76}
+{"ev":"no_beacon","secs":30}
+{"ev":"sent","to":"A","handle":91}
+{"ev":"sent","to":"A","handle":92}
+{"ev":"rx","from":"A","text":"auto A#687","seq":1338441535,"rssi":-77}
+{"ev":"sent","to":"A","handle":93}
+{"ev":"failed","to":"A","handle":88}
+{"ev":"rx","from":"A","text":"auto A#688","seq":1338441536,"rssi":-76}
+{"ev":"sent","to":"A","handle":94}
+{"ev":"failed","to":"A","handle":89}
+{"ev":"rx","from":"A","text":"auto A#686","seq":1338441534,"rssi":-77}
+{"ev":"sent","to":"A","handle":95}
+{"ev":"failed","to":"A","handle":90}
+{"ev":"rx","from":"A","text":"auto A#690","seq":1338441538,"rssi":-77}
+{"ev":"sent","to":"A","handle":96}
+{"ev":"failed","to":"A","handle":91}
+{"ev":"rx","from":"A","text":"auto A#691","seq":1338441539,"rssi":-76}
+{"ev":"sent","to":"A","handle":97}
+{"ev":"failed","to":"A","handle":92}
+{"ev":"rx","from":"A","text":"auto A#692","seq":1338441540,"rssi":-76}
+{"ev":"rx","from":"A","text":"auto A#689","seq":1338441537,"rssi":-77}
+{"ev":"sent","to":"A","handle":98}
+{"ev":"failed","to":"A","handle":93}
+{"ev":"sent","to":"A","handle":99}
+{"ev":"rx","from":"A","text":"auto A#694","seq":1338441542,"rssi":-76}
+{"ev":"failed","to":"A","handle":94}
+{"ev":"sent","to":"A","handle":100}
+{"ev":"failed","to":"A","handle":95}
+{"ev":"rx","from":"A","text":"auto A#695","seq":1338441543,"rssi":-72}
+{"ev":"sent","to":"A","handle":101}
+{"ev":"failed","to":"A","handle":96}
+{"ev":"delivered","to":"A","handle":98}
+{"ev":"sent","to":"A","handle":102}
+{"ev":"failed","to":"A","handle":97}
+{"ev":"delivered","to":"A","handle":99}
+{"ev":"sent","to":"A","handle":103}
+{"ev":"sent","to":"A","handle":104}
+{"ev":"delivered","to":"A","handle":104}
+{"ev":"rx","from":"A","text":"auto A#699","seq":1338441547,"rssi":-71}
+{"ev":"rx","from":"A","text":"auto A#698","seq":1338441546,"rssi":-71}
+{"ev":"rx","from":"A","text":"auto A#696","seq":1338441544,"rssi":-71}
+{"ev":"sent","to":"A","handle":105}
+{"ev":"failed","to":"A","handle":100}
+{"ev":"rx","from":"A","text":"auto A#700","seq":1338441548,"rssi":-70}
+{"ev":"sent","to":"A","handle":106}
+{"ev":"rx","from":"A","text":"auto A#701","seq":1338441549,"rssi":-69}
+{"ev":"failed","to":"A","handle":101}
+{"ev":"delivered","to":"A","handle":105}
+{"ev":"sent","to":"A","handle":107}
+{"ev":"rx","from":"A","text":"auto A#702","seq":1338441550,"rssi":-69}
+{"ev":"failed","to":"A","handle":102}
+{"ev":"sent","to":"A","handle":108}
+{"ev":"rx","from":"A","text":"auto A#703","seq":1338441551,"rssi":-69}
+{"ev":"failed","to":"A","handle":103}
+{"ev":"sent","to":"A","handle":109}
+{"ev":"rx","from":"A","text":"auto A#704","seq":1338441552,"rssi":-69}
+{"ev":"delivered","to":"A","handle":106}
+{"ev":"sent","to":"A","handle":110}
+{"ev":"sent","to":"A","handle":111}
+{"ev":"rx","from":"A","text":"auto A#706","seq":1338441554,"rssi":-70}
+{"ev":"sent","to":"A","handle":112}
+{"ev":"failed","to":"A","handle":107}
+{"ev":"sent","to":"A","handle":113}
+{"ev":"failed","to":"A","handle":108}
+{"ev":"rx","from":"A","text":"auto A#708","seq":1338441556,"rssi":-72}
+{"ev":"rx","from":"A","text":"auto A#705","seq":1338441553,"rssi":-72}
+{"ev":"sent","to":"A","handle":114}
+{"ev":"rx","from":"A","text":"auto A#709","seq":1338441557,"rssi":-71}
+{"ev":"failed","to":"A","handle":109}
+{"ev":"sent","to":"A","handle":115}
+{"ev":"failed","to":"A","handle":110}
+{"ev":"delivered","to":"A","handle":114}
+{"ev":"rx","from":"A","text":"auto A#710","seq":1338441558,"rssi":-71}
+{"ev":"sent","to":"A","handle":116}
+{"ev":"failed","to":"A","handle":111}
+{"ev":"sent","to":"A","handle":117}
+{"ev":"delivered","to":"A","handle":117}
+{"ev":"failed","to":"A","handle":112}
+{"ev":"rx","from":"A","text":"auto A#711","seq":1338441559,"rssi":-71}
+{"ev":"epoch","epoch":35642,"pseudo":"2ffb4fd1","mac_outage_us":5345}
+{"ev":"sent","to":"A","handle":118}
+{"ev":"failed","to":"A","handle":113}
+{"ev":"rx","from":"A","text":"auto A#712","seq":1338441560,"rssi":-75}
+{"ev":"sent","to":"A","handle":119}
+{"ev":"rx","from":"A","text":"auto A#713","seq":1338441561,"rssi":-74}
+{"ev":"sent","to":"A","handle":120}
+{"ev":"rx","from":"A","text":"auto A#715","seq":1338441563,"rssi":-72}
+{"ev":"failed","to":"A","handle":115}
+{"ev":"sent","to":"A","handle":121}
+{"ev":"failed","to":"A","handle":116}
+{"ev":"rx","from":"A","text":"auto A#716","seq":1338441564,"rssi":-71}
+{"ev":"sent","to":"A","handle":122}
+{"ev":"rx","from":"A","text":"auto A#717","seq":1338441565,"rssi":-72}
+{"ev":"status","name":"C","synced":true,"mesh_ms":1795203767253,"epoch":35646,"pseudo":"fcf2a5d3","rx":141,"tx":139,"keys_sent":6,"beacons":6,"delivered":26,"acked":26,"failed":0,"relayed":61,"dup":52,"cancelled":0,"bad_link_tag":0,"bad_epoch":21,"blocked":0,"not_synced":1,"stale":0,"rate_limited":0,"gate_drops":0,"allow_drops":0,"queued":0,"mac_outage_us":5374}
+{"ev":"radio","airtime_avg_us":3155,"rx_overflow":0,"tx_fail":0,"free_heap":144268,"rotate_mac":true,"rssi_gate":-127,"allow_n":0,"auto_to":"A","auto_every_s":2}
+{"ev":"rx","from":"A","text":"auto A#856","seq":1338441704,"rssi":-85}
+{"ev":"sent","to":"A","handle":27}
+{"ev":"delivered","to":"A","handle":27}
+{"ev":"rx","from":"A","text":"auto A#857","seq":1338441705,"rssi":-87}
+{"ev":"sent","to":"A","handle":28}
+{"ev":"delivered","to":"A","handle":28}
+{"ev":"rx","from":"A","text":"auto A#858","seq":1338441706,"rssi":-85}
+{"ev": "mark", "t": 1795203772.205, "note": "different room/mark different room/mark different room"}
+{"ev":"sent","to":"A","handle":29}
+{"ev":"delivered","to":"A","handle":29}
+{"ev":"rx","from":"A","text":"auto A#859","seq":1338441707,"rssi":-86}
+{"ev":"sent","to":"A","handle":30}
+{"ev":"delivered","to":"A","handle":30}
+{"ev":"rx","from":"A","text":"auto A#860","seq":1338441708,"rssi":-85}
+{"ev":"sent","to":"A","handle":31}
+{"ev":"delivered","to":"A","handle":31}
+{"ev":"rx","from":"A","text":"auto A#861","seq":1338441709,"rssi":-87}
+{"ev":"sent","to":"A","handle":32}
+{"ev":"delivered","to":"A","handle":32}
+{"ev":"rx","from":"A","text":"auto A#862","seq":1338441710,"rssi":-86}
+{"ev":"epoch","epoch":35647,"pseudo":"7384001f","mac_outage_us":5326}
+{"ev":"sent","to":"A","handle":33}
+{"ev":"delivered","to":"A","handle":33}
+{"ev":"rx","from":"A","text":"auto A#863","seq":1338441711,"rssi":-87}
+{"ev":"sent","to":"A","handle":34}
+{"ev":"delivered","to":"A","handle":34}
+{"ev":"rx","from":"A","text":"auto A#864","seq":1338441712,"rssi":-87}
+{"ev":"sent","to":"A","handle":35}
+{"ev":"delivered","to":"A","handle":35}
+{"ev":"rx","from":"A","text":"auto A#865","seq":1338441713,"rssi":-87}
+{"ev":"sent","to":"A","handle":36}
+{"ev":"delivered","to":"A","handle":36}
+{"ev":"rx","from":"A","text":"auto A#866","seq":1338441714,"rssi":-85}
+{"ev":"sent","to":"A","handle":37}
+{"ev":"delivered","to":"A","handle":37}
+{"ev":"rx","from":"A","text":"auto A#867","seq":1338441715,"rssi":-86}
+{"ev":"sent","to":"A","handle":38}
+{"ev":"delivered","to":"A","handle":38}
+{"ev":"rx","from":"A","text":"auto A#868","seq":1338441716,"rssi":-85}
+{"ev":"sent","to":"A","handle":39}
+{"ev":"delivered","to":"A","handle":39}
+{"ev":"rx","from":"A","text":"auto A#869","seq":1338441717,"rssi":-84}
+{"ev":"sent","to":"A","handle":40}
+{"ev":"delivered","to":"A","handle":40}
+{"ev":"rx","from":"A","text":"auto A#870","seq":1338441718,"rssi":-86}
+{"ev":"sent","to":"A","handle":41}
+{"ev":"rx","from":"A","text":"auto A#871","seq":1338441719,"rssi":-85}
+{"ev":"sent","to":"A","handle":42}
+{"ev":"delivered","to":"A","handle":42}
+{"ev":"rx","from":"A","text":"auto A#872","seq":1338441720,"rssi":-84}
+{"ev":"sent","to":"A","handle":43}
+{"ev":"rx","from":"A","text":"auto A#873","seq":1338441721,"rssi":-87}
+{"ev":"delivered","to":"A","handle":43}
+{"ev":"sent","to":"A","handle":44}
+{"ev":"delivered","to":"A","handle":44}
+{"ev":"rx","from":"A","text":"auto A#874","seq":1338441722,"rssi":-84}
+{"ev":"delivered","to":"A","handle":41}
+{"ev":"sent","to":"A","handle":45}
+{"ev":"delivered","to":"A","handle":45}
+{"ev":"rx","from":"A","text":"auto A#875","seq":1338441723,"rssi":-86}
+{"ev":"sent","to":"A","handle":46}
+{"ev":"delivered","to":"A","handle":46}
+{"ev":"rx","from":"A","text":"auto A#876","seq":1338441724,"rssi":-86}
+{"ev":"sent","to":"A","handle":47}
+{"ev":"delivered","to":"A","handle":47}
+{"ev":"rx","from":"A","text":"auto A#877","seq":1338441725,"rssi":-86}
+{"ev":"sent","to":"A","handle":48}
+{"ev":"rx","from":"A","text":"auto A#878","seq":1338441726,"rssi":-85}
+{"ev":"delivered","to":"A","handle":48}
+{"ev":"sent","to":"A","handle":49}
+{"ev":"delivered","to":"A","handle":49}
+{"ev":"rx","from":"A","text":"auto A#879","seq":1338441727,"rssi":-86}
+{"ev":"sent","to":"A","handle":50}
+{"ev":"rx","from":"A","text":"auto A#880","seq":1338441728,"rssi":-85}
+{"ev":"sent","to":"A","handle":51}
+{"ev":"delivered","to":"A","handle":51}
+{"ev":"rx","from":"A","text":"auto A#881","seq":1338441729,"rssi":-85}
+{"ev":"delivered","to":"A","handle":50}
+{"ev":"sent","to":"A","handle":52}
+{"ev":"rx","from":"A","text":"auto A#882","seq":1338441730,"rssi":-85}
+{"ev":"delivered","to":"A","handle":52}
+{"ev":"sent","to":"A","handle":53}
+{"ev":"rx","from":"A","text":"auto A#883","seq":1338441731,"rssi":-86}
+{"ev":"delivered","to":"A","handle":53}
+{"ev":"sent","to":"A","handle":54}
+{"ev":"rx","from":"A","text":"auto A#884","seq":1338441732,"rssi":-86}
+{"ev":"delivered","to":"A","handle":54}
+{"ev":"sent","to":"A","handle":55}
+{"ev":"rx","from":"A","text":"auto A#885","seq":1338441733,"rssi":-86}
+{"ev":"delivered","to":"A","handle":55}
+{"ev":"sent","to":"A","handle":56}
+{"ev":"delivered","to":"A","handle":56}
+{"ev":"rx","from":"A","text":"auto A#886","seq":1338441734,"rssi":-86}
+{"ev":"sent","to":"A","handle":57}
+{"ev":"rx","from":"A","text":"auto A#887","seq":1338441735,"rssi":-86}
+{"ev":"delivered","to":"A","handle":57}
+{"ev":"sent","to":"A","handle":58}
+{"ev":"delivered","to":"A","handle":58}
+{"ev":"rx","from":"A","text":"auto A#888","seq":1338441736,"rssi":-84}
+{"ev":"sent","to":"A","handle":59}
+{"ev":"rx","from":"A","text":"auto A#889","seq":1338441737,"rssi":-85}
+{"ev":"delivered","to":"A","handle":59}
+{"ev":"sent","to":"A","handle":60}
+{"ev":"delivered","to":"A","handle":60}
+{"ev":"rx","from":"A","text":"auto A#890","seq":1338441738,"rssi":-86}
+{"ev":"sent","to":"A","handle":61}
+{"ev":"delivered","to":"A","handle":61}
+{"ev":"rx","from":"A","text":"auto A#891","seq":1338441739,"rssi":-87}
+{"ev":"sent","to":"A","handle":62}
+{"ev":"rx","from":"A","text":"auto A#892","seq":1338441740,"rssi":-86}
+{"ev":"epoch","epoch":35648,"pseudo":"b8f434de","mac_outage_us":5337}
+{"ev":"sent","to":"A","handle":63}
+{"ev":"delivered","to":"A","handle":63}
+{"ev":"rx","from":"A","text":"auto A#893","seq":1338441741,"rssi":-86}
+{"ev":"sent","to":"A","handle":64}
+{"ev":"rx","from":"A","text":"auto A#894","seq":1338441742,"rssi":-87}
+{"ev":"sent","to":"A","handle":65}
+{"ev":"delivered","to":"A","handle":65}
+{"ev":"delivered","to":"A","handle":64}
+{"ev":"rx","from":"A","text":"auto A#895","seq":1338441743,"rssi":-88}
+{"ev":"sent","to":"A","handle":66}
+{"ev":"delivered","to":"A","handle":66}
+{"ev":"rx","from":"A","text":"auto A#896","seq":1338441744,"rssi":-86}
+{"ev":"sent","to":"A","handle":67}
+{"ev":"failed","to":"A","handle":62}
+{"ev":"rx","from":"A","text":"auto A#897","seq":1338441745,"rssi":-86}
+{"ev":"sent","to":"A","handle":68}
+{"ev":"delivered","to":"A","handle":68}
+{"ev":"rx","from":"A","text":"auto A#898","seq":1338441746,"rssi":-86}
+{"ev":"delivered","to":"A","handle":67}
+{"ev":"sent","to":"A","handle":69}
+{"ev":"delivered","to":"A","handle":69}
+{"ev":"rx","from":"A","text":"auto A#899","seq":1338441747,"rssi":-86}
+{"ev":"sent","to":"A","handle":70}
+{"ev":"delivered","to":"A","handle":70}
+{"ev":"rx","from":"A","text":"auto A#900","seq":1338441748,"rssi":-85}
+{"ev":"sent","to":"A","handle":71}
+{"ev":"sent","to":"A","handle":72}
+{"ev":"delivered","to":"A","handle":71}
+{"ev":"rx","from":"A","text":"auto A#902","seq":1338441750,"rssi":-86}
+{"ev":"rx","from":"A","text":"auto A#901","seq":1338441749,"rssi":-84}
+{"ev":"sent","to":"A","handle":73}
+{"ev":"delivered","to":"A","handle":73}
+{"ev":"rx","from":"A","text":"auto A#903","seq":1338441751,"rssi":-85}
+{"ev":"delivered","to":"A","handle":72}
+{"ev":"sent","to":"A","handle":74}
+{"ev":"rx","from":"A","text":"auto A#904","seq":1338441752,"rssi":-84}
+{"ev":"delivered","to":"A","handle":74}
+{"ev":"sent","to":"A","handle":75}
+{"ev":"delivered","to":"A","handle":75}
+{"ev":"rx","from":"A","text":"auto A#905","seq":1338441753,"rssi":-86}
+{"ev":"sent","to":"A","handle":76}
+{"ev":"delivered","to":"A","handle":76}
+{"ev":"rx","from":"A","text":"auto A#906","seq":1338441754,"rssi":-85}
+{"ev":"sent","to":"A","handle":77}
+{"ev":"delivered","to":"A","handle":77}
+{"ev":"rx","from":"A","text":"auto A#907","seq":1338441755,"rssi":-86}
+{"ev":"sent","to":"A","handle":78}
+{"ev":"delivered","to":"A","handle":78}
+{"ev":"rx","from":"A","text":"auto A#908","seq":1338441756,"rssi":-86}
+{"ev":"sent","to":"A","handle":79}
+{"ev":"rx","from":"A","text":"auto A#909","seq":1338441757,"rssi":-85}
+{"ev":"sent","to":"A","handle":80}
+{"ev":"rx","from":"A","text":"auto A#910","seq":1338441758,"rssi":-86}
+{"ev":"delivered","to":"A","handle":80}
+{"ev":"sent","to":"A","handle":81}
+{"ev":"rx","from":"A","text":"auto A#911","seq":1338441759,"rssi":-86}
+{"ev":"delivered","to":"A","handle":81}
+{"ev":"sent","to":"A","handle":82}
+{"ev":"delivered","to":"A","handle":82}
+{"ev":"rx","from":"A","text":"auto A#912","seq":1338441760,"rssi":-85}
+{"ev":"delivered","to":"A","handle":79}
+{"ev":"sent","to":"A","handle":83}
+{"ev":"rx","from":"A","text":"auto A#913","seq":1338441761,"rssi":-86}
+{"ev":"delivered","to":"A","handle":83}
+{"ev":"sent","to":"A","handle":84}
+{"ev":"delivered","to":"A","handle":84}
+{"ev":"rx","from":"A","text":"auto A#914","seq":1338441762,"rssi":-84}
+{"ev":"sent","to":"A","handle":85}
+{"ev":"rx","from":"A","text":"auto A#915","seq":1338441763,"rssi":-86}
+{"ev":"sent","to":"A","handle":86}
+{"ev":"rx","from":"A","text":"auto A#916","seq":1338441764,"rssi":-88}
+{"ev":"delivered","to":"A","handle":86}
+{"ev":"delivered","to":"A","handle":85}
+{"ev":"sent","to":"A","handle":87}
+{"ev":"delivered","to":"A","handle":87}
+{"ev":"rx","from":"A","text":"auto A#917","seq":1338441765,"rssi":-86}
+{"ev":"sent","to":"A","handle":88}
+{"ev":"delivered","to":"A","handle":88}
+{"ev":"rx","from":"A","text":"auto A#918","seq":1338441766,"rssi":-88}
+{"ev":"sent","to":"A","handle":89}
+{"ev":"rx","from":"A","text":"auto A#919","seq":1338441767,"rssi":-86}
+{"ev":"delivered","to":"A","handle":89}
+{"ev":"sent","to":"A","handle":90}
+{"ev":"delivered","to":"A","handle":90}
+{"ev":"rx","from":"A","text":"auto A#920","seq":1338441768,"rssi":-85}
+{"ev":"sent","to":"A","handle":91}
+{"ev":"delivered","to":"A","handle":91}
+{"ev":"rx","from":"A","text":"auto A#921","seq":1338441769,"rssi":-87}
+{"ev":"sent","to":"A","handle":92}
+{"ev":"delivered","to":"A","handle":92}
+{"ev":"epoch","epoch":35649,"pseudo":"4e3ee902","mac_outage_us":5350}
+{"ev":"sent","to":"A","handle":93}
+{"ev":"delivered","to":"A","handle":93}
+{"ev":"rx","from":"A","text":"auto A#923","seq":1338441771,"rssi":-86}
+{"ev":"sent","to":"A","handle":94}
+{"ev":"delivered","to":"A","handle":94}
+{"ev":"rx","from":"A","text":"auto A#924","seq":1338441772,"rssi":-85}
+{"ev":"sent","to":"A","handle":95}
+{"ev":"rx","from":"A","text":"auto A#925","seq":1338441773,"rssi":-83}
+{"ev":"delivered","to":"A","handle":95}
+{"ev":"rx","from":"A","text":"auto A#922","seq":1338441770,"rssi":-86}
+{"ev":"sent","to":"A","handle":96}
+{"ev":"delivered","to":"A","handle":96}
+{"ev":"rx","from":"A","text":"auto A#926","seq":1338441774,"rssi":-86}
+{"ev":"sent","to":"A","handle":97}
+{"ev":"rx","from":"A","text":"auto A#927","seq":1338441775,"rssi":-86}
+{"ev":"delivered","to":"A","handle":97}
+{"ev":"sent","to":"A","handle":98}
+{"ev":"rx","from":"A","text":"auto A#928","seq":1338441776,"rssi":-86}
+{"ev":"delivered","to":"A","handle":98}
+{"ev":"sent","to":"A","handle":99}
+{"ev":"delivered","to":"A","handle":99}
+{"ev":"rx","from":"A","text":"auto A#929","seq":1338441777,"rssi":-86}
+{"ev":"sent","to":"A","handle":100}
+{"ev":"delivered","to":"A","handle":100}
+{"ev":"rx","from":"A","text":"auto A#930","seq":1338441778,"rssi":-86}
+{"ev":"sent","to":"A","handle":101}
+{"ev":"delivered","to":"A","handle":101}
+{"ev":"rx","from":"A","text":"auto A#931","seq":1338441779,"rssi":-85}
+{"ev":"sent","to":"A","handle":102}
+{"ev":"rx","from":"A","text":"auto A#932","seq":1338441780,"rssi":-87}
+{"ev":"sent","to":"A","handle":103}
+{"ev":"delivered","to":"A","handle":103}
+{"ev":"rx","from":"A","text":"auto A#933","seq":1338441781,"rssi":-86}
+{"ev":"sent","to":"A","handle":104}
+{"ev":"delivered","to":"A","handle":104}
+{"ev":"rx","from":"A","text":"auto A#934","seq":1338441782,"rssi":-86}
+{"ev":"sent","to":"A","handle":105}
+{"ev":"delivered","to":"A","handle":105}
+{"ev":"rx","from":"A","text":"auto A#935","seq":1338441783,"rssi":-85}
+{"ev":"delivered","to":"A","handle":102}
+{"ev":"sent","to":"A","handle":106}
+{"ev":"delivered","to":"A","handle":106}
+{"ev":"rx","from":"A","text":"auto A#936","seq":1338441784,"rssi":-86}
+{"ev":"sent","to":"A","handle":107}
+{"ev":"rx","from":"A","text":"auto A#937","seq":1338441785,"rssi":-85}
+{"ev":"sent","to":"A","handle":108}
+{"ev":"delivered","to":"A","handle":108}
+{"ev":"rx","from":"A","text":"auto A#938","seq":1338441786,"rssi":-85}
+{"ev":"delivered","to":"A","handle":107}
+{"ev":"sent","to":"A","handle":109}
+{"ev":"delivered","to":"A","handle":109}
+{"ev":"rx","from":"A","text":"auto A#939","seq":1338441787,"rssi":-86}
+{"ev":"sent","to":"A","handle":110}
+{"ev":"delivered","to":"A","handle":110}
+{"ev":"rx","from":"A","text":"auto A#940","seq":1338441788,"rssi":-85}
+{"ev":"sent","to":"A","handle":111}
+{"ev":"delivered","to":"A","handle":111}
+{"ev":"rx","from":"A","text":"auto A#941","seq":1338441789,"rssi":-86}
+{"ev":"sent","to":"A","handle":112}
+{"ev":"delivered","to":"A","handle":112}
+{"ev":"rx","from":"A","text":"auto A#942","seq":1338441790,"rssi":-84}
+{"ev":"sent","to":"A","handle":113}
+{"ev":"rx","from":"A","text":"auto A#943","seq":1338441791,"rssi":-85}
+{"ev":"sent","to":"A","handle":114}
+{"ev":"delivered","to":"A","handle":114}
+{"ev":"rx","from":"A","text":"auto A#944","seq":1338441792,"rssi":-86}
+{"ev":"sent","to":"A","handle":115}
+{"ev":"rx","from":"A","text":"auto A#945","seq":1338441793,"rssi":-83}
+{"ev":"sent","to":"A","handle":116}
+{"ev":"rx","from":"A","text":"auto A#946","seq":1338441794,"rssi":-86}
+{"ev":"delivered","to":"A","handle":115}
+{"ev":"delivered","to":"A","handle":116}
+{"ev":"delivered","to":"A","handle":113}
+{"ev":"sent","to":"A","handle":117}
+{"ev":"delivered","to":"A","handle":117}
+{"ev":"rx","from":"A","text":"auto A#947","seq":1338441795,"rssi":-87}
+{"ev":"sent","to":"A","handle":118}
+{"ev":"delivered","to":"A","handle":118}
+{"ev":"rx","from":"A","text":"auto A#948","seq":1338441796,"rssi":-85}
+{"ev":"sent","to":"A","handle":119}
+{"ev":"rx","from":"A","text":"auto A#949","seq":1338441797,"rssi":-87}
+{"ev":"sent","to":"A","handle":120}
+{"ev":"rx","from":"A","text":"auto A#950","seq":1338441798,"rssi":-85}
+{"ev":"delivered","to":"A","handle":120}
+{"ev":"sent","to":"A","handle":121}
+{"ev":"delivered","to":"A","handle":121}
+{"ev":"rx","from":"A","text":"auto A#951","seq":1338441799,"rssi":-85}
+{"ev":"sent","to":"A","handle":122}
+{"ev":"rx","from":"A","text":"auto A#952","seq":1338441800,"rssi":-84}
+{"ev":"delivered","to":"A","handle":122}
+{"ev":"delivered","to":"A","handle":119}
+{"ev":"epoch","epoch":35650,"pseudo":"142b556b","mac_outage_us":5408}
+{"ev":"sent","to":"A","handle":123}
+{"ev":"delivered","to":"A","handle":123}
+{"ev":"rx","from":"A","text":"auto A#953","seq":1338441801,"rssi":-87}
+{"ev":"sent","to":"A","handle":124}
+{"ev":"delivered","to":"A","handle":124}
+{"ev":"rx","from":"A","text":"auto A#954","seq":1338441802,"rssi":-85}
+{"ev":"sent","to":"A","handle":125}
+{"ev":"delivered","to":"A","handle":125}
+{"ev":"rx","from":"A","text":"auto A#955","seq":1338441803,"rssi":-85}
+{"ev":"sent","to":"A","handle":126}
+{"ev":"delivered","to":"A","handle":126}
+{"ev":"rx","from":"A","text":"auto A#956","seq":1338441804,"rssi":-84}
+{"ev":"sent","to":"A","handle":127}
+{"ev":"rx","from":"A","text":"auto A#957","seq":1338441805,"rssi":-85}
+{"ev":"delivered","to":"A","handle":127}
+{"ev":"sent","to":"A","handle":128}
+{"ev":"rx","from":"A","text":"auto A#958","seq":1338441806,"rssi":-87}
+{"ev":"delivered","to":"A","handle":128}
+{"ev":"sent","to":"A","handle":129}
+{"ev":"rx","from":"A","text":"auto A#959","seq":1338441807,"rssi":-86}
+{"ev":"delivered","to":"A","handle":129}
+{"ev":"sent","to":"A","handle":130}
+{"ev":"rx","from":"A","text":"auto A#960","seq":1338441808,"rssi":-86}
+{"ev":"delivered","to":"A","handle":130}
+{"ev":"sent","to":"A","handle":131}
+{"ev":"delivered","to":"A","handle":131}
+{"ev":"rx","from":"A","text":"auto A#961","seq":1338441809,"rssi":-87}
+{"ev":"sent","to":"A","handle":132}
+{"ev":"delivered","to":"A","handle":132}
+{"ev":"rx","from":"A","text":"auto A#962","seq":1338441810,"rssi":-85}
+{"ev":"sent","to":"A","handle":133}
+{"ev":"delivered","to":"A","handle":133}
+{"ev":"rx","from":"A","text":"auto A#963","seq":1338441811,"rssi":-85}
+{"ev":"sent","to":"A","handle":134}
+{"ev":"delivered","to":"A","handle":134}
+{"ev":"rx","from":"A","text":"auto A#964","seq":1338441812,"rssi":-86}
+{"ev":"sent","to":"A","handle":135}
+{"ev":"delivered","to":"A","handle":135}
+{"ev":"rx","from":"A","text":"auto A#965","seq":1338441813,"rssi":-85}
+{"ev":"sent","to":"A","handle":136}
+{"ev":"delivered","to":"A","handle":136}
+{"ev":"rx","from":"A","text":"auto A#966","seq":1338441814,"rssi":-86}
+{"ev":"sent","to":"A","handle":137}
+{"ev":"log","what":"replay_stale","msg_id":"2a38ab7904be8bc5","ttl":5,"hop":0}
+{"ev":"log","what":"replay_stale","msg_id":"9bf567f1ce606f90","ttl":5,"hop":0}
+{"ev":"log","what":"replay_stale","msg_id":"a8faba0a84df7a6d","ttl":3,"hop":2}
+{"ev":"log","what":"replay_stale","msg_id":"f4263bfe9aa6f42b","ttl":4,"hop":1}
+{"ev":"log","what":"replay_stale","msg_id":"7811e5201ad5adbb","ttl":5,"hop":0}
+{"ev":"log","what":"replay_stale","msg_id":"8113b053cea6285b","ttl":5,"hop":0}
+{"ev":"log","what":"replay_stale","msg_id":"52da39314dd7bc4f","ttl":5,"hop":0}
+{"ev":"log","what":"replay_stale","msg_id":"df3eb85d26fb941d","ttl":5,"hop":0}
+{"ev":"log","what":"replay_stale","msg_id":"1f8ce59815afdb29","ttl":5,"hop":0}
+{"ev":"log","what":"replay_stale","msg_id":"c50c296bdee6ff42","ttl":3,"hop":2}
+{"ev":"log","what":"replay_stale","msg_id":"5c289b22fe7df0af","ttl":4,"hop":1}
+{"ev":"log","what":"replay_stale","msg_id":"90354e85252f6f01","ttl":4,"hop":1}
+{"ev":"log","what":"replay_stale","msg_id":"d853f318a3811f63","ttl":4,"hop":1}
+{"ev":"log","what":"replay_stale","msg_id":"ae782e600f6cc411","ttl":5,"hop":0}
+{"ev":"log","what":"replay_stale","msg_id":"35218a3020632d17","ttl":4,"hop":1}
+{"ev":"log","what":"replay_stale","msg_id":"77999ff06f627627","ttl":4,"hop":1}
+{"ev":"log","what":"replay_stale","msg_id":"41b901de5484b242","ttl":5,"hop":0}
+{"ev":"log","what":"replay_stale","msg_id":"a36218d721a9359d","ttl":3,"hop":2}
+{"ev":"log","what":"replay_stale","msg_id":"076265c96866c5ac","ttl":3,"hop":2}
+{"ev":"log","what":"rate_limited","msg_id":"48b96425e0361a43","ttl":5,"hop":0}
+{"ev":"log","what":"rate_limited","msg_id":"01983e15ec206d94","ttl":5,"hop":0}
+{"ev":"log","what":"rate_limited","msg_id":"e1e357e74d39503f","ttl":4,"hop":1}
+{"ev":"log","what":"rate_limited","msg_id":"d79371128827f0b7","ttl":3,"hop":2}
+{"ev":"log","what":"rate_limited","msg_id":"0992ee600bc08c48","ttl":3,"hop":2}
+{"ev":"log","what":"rate_limited","msg_id":"e3f09143e8c42330","ttl":5,"hop":0}
+{"ev":"log","what":"rate_limited","msg_id":"4c35b408bc5d2eea","ttl":5,"hop":0}
+{"ev":"log","what":"rate_limited","msg_id":"134f9a97e6dd95b4","ttl":4,"hop":1}
+{"ev":"log","what":"rate_limited","msg_id":"7e784dd379b10518","ttl":4,"hop":1}
+{"ev":"epoch","epoch":35651,"pseudo":"3c8d5256","mac_outage_us":55749}
+{"ev":"sent","to":"A","handle":152}
+{"ev":"status","name":"C","synced":true,"mesh_ms":1795204049235,"epoch":35651,"pseudo":"3c8d5256","rx":753,"tx":844,"keys_sent":31,"beacons":32,"delivered":153,"acked":148,"failed":2,"relayed":403,"dup":296,"cancelled":0,"bad_link_tag":0,"bad_epoch":21,"blocked":0,"not_synced":1,"stale":25,"rate_limited":9,"gate_drops":0,"allow_drops":0,"queued":0,"mac_outage_us":55749}
+{"ev":"radio","airtime_avg_us":3186,"rx_overflow":13,"tx_fail":0,"free_heap":143844,"rotate_mac":true,"rssi_gate":-127,"allow_n":0,"auto_to":"A","auto_every_s":2}
+{"ev":"delivered","to":"A","handle":152}
+{"ev":"rx","from":"A","text":"auto A#996","seq":1338441844,"rssi":-79}
+{"ev":"rx","from":"A","text":"auto A#994","seq":1338441842,"rssi":-81}
+{"ev":"rx","from":"A","text":"auto A#997","seq":1338441845,"rssi":-81}
+{"ev":"rx","from":"A","text":"auto A#998","seq":1338441846,"rssi":-81}
+{"ev":"sent","to":"A","handle":153}
+{"ev":"delivered","to":"A","handle":151}
+{"ev": "mark", "t": 1795204051.397, "note": "diff room but much closer"}
+{"ev":"delivered","to":"A","handle":153}
+{"ev":"rx","from":"A","text":"auto A#999","seq":1338441847,"rssi":-81}
+{"ev":"sent","to":"A","handle":154}
+{"ev":"delivered","to":"A","handle":154}
+{"ev":"rx","from":"A","text":"auto A#1000","seq":1338441848,"rssi":-80}
+{"ev":"sent","to":"A","handle":155}
+{"ev":"delivered","to":"A","handle":155}
+{"ev":"rx","from":"A","text":"auto A#1001","seq":1338441849,"rssi":-81}
+{"ev":"sent","to":"A","handle":156}
+{"ev":"delivered","to":"A","handle":156}
+{"ev":"rx","from":"A","text":"auto A#1002","seq":1338441850,"rssi":-81}
+{"ev":"sent","to":"A","handle":157}
+{"ev":"delivered","to":"A","handle":157}
+{"ev":"rx","from":"A","text":"auto A#1003","seq":1338441851,"rssi":-81}
+{"ev":"sent","to":"A","handle":158}
+{"ev":"delivered","to":"A","handle":158}
+{"ev":"sent","to":"A","handle":159}
+{"ev":"delivered","to":"A","handle":159}
+{"ev":"rx","from":"A","text":"auto A#1004","seq":1338441852,"rssi":-81}
+{"ev":"sent","to":"A","handle":160}
+{"ev":"delivered","to":"A","handle":160}
+{"ev":"rx","from":"A","text":"auto A#1005","seq":1338441853,"rssi":-78}
+{"ev":"rx","from":"A","text":"auto A#1006","seq":1338441854,"rssi":-81}
+{"ev":"sent","to":"A","handle":161}
+{"ev":"delivered","to":"A","handle":161}
+{"ev":"sent","to":"A","handle":162}
+{"ev":"rx","from":"A","text":"auto A#1007","seq":1338441855,"rssi":-79}
+{"ev":"delivered","to":"A","handle":162}
+{"ev":"sent","to":"A","handle":163}
+{"ev":"rx","from":"A","text":"auto A#1008","seq":1338441856,"rssi":-80}
+{"ev":"delivered","to":"A","handle":163}
+{"ev":"sent","to":"A","handle":164}
+{"ev":"delivered","to":"A","handle":164}
+{"ev":"rx","from":"A","text":"auto A#1009","seq":1338441857,"rssi":-80}
+{"ev":"sent","to":"A","handle":165}
+{"ev":"rx","from":"A","text":"auto A#1010","seq":1338441858,"rssi":-79}
+{"ev":"delivered","to":"A","handle":165}
+{"ev":"sent","to":"A","handle":166}
+{"ev":"rx","from":"A","text":"auto A#1011","seq":1338441859,"rssi":-80}
+{"ev":"sent","to":"A","handle":167}
+{"ev":"rx","from":"A","text":"auto A#1012","seq":1338441860,"rssi":-81}
+{"ev":"delivered","to":"A","handle":167}
+{"ev":"epoch","epoch":35652,"pseudo":"960981b4","mac_outage_us":5309}
+{"ev":"sent","to":"A","handle":168}
+{"ev":"delivered","to":"A","handle":168}
+{"ev":"rx","from":"A","text":"auto A#1013","seq":1338441861,"rssi":-81}
+{"ev":"sent","to":"A","handle":169}
+{"ev":"rx","from":"A","text":"auto A#1014","seq":1338441862,"rssi":-81}
+{"ev":"delivered","to":"A","handle":169}
+{"ev":"delivered","to":"A","handle":166}
+{"ev":"sent","to":"A","handle":170}
+{"ev":"delivered","to":"A","handle":170}
+{"ev":"rx","from":"A","text":"auto A#1015","seq":1338441863,"rssi":-81}
+{"ev":"sent","to":"A","handle":171}
+{"ev":"rx","from":"A","text":"auto A#1016","seq":1338441864,"rssi":-80}
+{"ev":"delivered","to":"A","handle":171}
+{"ev":"sent","to":"A","handle":172}
+{"ev":"rx","from":"A","text":"auto A#1017","seq":1338441865,"rssi":-81}
+{"ev":"delivered","to":"A","handle":172}
+{"ev":"sent","to":"A","handle":173}
+{"ev":"rx","from":"A","text":"auto A#1018","seq":1338441866,"rssi":-81}
+{"ev":"delivered","to":"A","handle":173}
+{"ev":"sent","to":"A","handle":174}
+{"ev":"rx","from":"A","text":"auto A#1019","seq":1338441867,"rssi":-81}
+{"ev":"delivered","to":"A","handle":174}
+{"ev":"sent","to":"A","handle":175}
+{"ev":"rx","from":"A","text":"auto A#1020","seq":1338441868,"rssi":-82}
+{"ev":"sent","to":"A","handle":176}
+{"ev":"delivered","to":"A","handle":176}
+{"ev":"rx","from":"A","text":"auto A#1021","seq":1338441869,"rssi":-82}
+{"ev":"sent","to":"A","handle":177}
+{"ev":"rx","from":"A","text":"auto A#1022","seq":1338441870,"rssi":-81}
+{"ev":"sent","to":"A","handle":178}
+{"ev":"rx","from":"A","text":"auto A#1023","seq":1338441871,"rssi":-80}
+{"ev":"delivered","to":"A","handle":177}
+{"ev":"delivered","to":"A","handle":178}
+{"ev":"delivered","to":"A","handle":175}
+{"ev":"sent","to":"A","handle":179}
+{"ev":"delivered","to":"A","handle":179}
+{"ev":"rx","from":"A","text":"auto A#1024","seq":1338441872,"rssi":-78}
+{"ev":"sent","to":"A","handle":180}
+{"ev":"rx","from":"A","text":"auto A#1025","seq":1338441873,"rssi":-81}
+{"ev":"delivered","to":"A","handle":180}
+{"ev":"sent","to":"A","handle":181}
+{"ev":"rx","from":"A","text":"auto A#1026","seq":1338441874,"rssi":-79}
+{"ev":"delivered","to":"A","handle":181}
+{"ev":"sent","to":"A","handle":182}
+{"ev":"delivered","to":"A","handle":182}
+{"ev":"rx","from":"A","text":"auto A#1027","seq":1338441875,"rssi":-80}
+{"ev":"sent","to":"A","handle":183}
+{"ev":"delivered","to":"A","handle":183}
+{"ev":"rx","from":"A","text":"auto A#1028","seq":1338441876,"rssi":-83}
+{"ev":"sent","to":"A","handle":184}
+{"ev":"rx","from":"A","text":"auto A#1029","seq":1338441877,"rssi":-81}
+{"ev":"delivered","to":"A","handle":184}
+{"ev":"sent","to":"A","handle":185}
+{"ev":"rx","from":"A","text":"auto A#1030","seq":1338441878,"rssi":-82}
+{"ev":"delivered","to":"A","handle":185}
+{"ev":"sent","to":"A","handle":186}
+{"ev":"rx","from":"A","text":"auto A#1031","seq":1338441879,"rssi":-81}
+{"ev":"delivered","to":"A","handle":186}
+{"ev":"sent","to":"A","handle":187}
+{"ev":"rx","from":"A","text":"auto A#1032","seq":1338441880,"rssi":-81}
+{"ev":"delivered","to":"A","handle":187}
+{"ev":"sent","to":"A","handle":188}
+{"ev":"rx","from":"A","text":"auto A#1033","seq":1338441881,"rssi":-80}
+{"ev":"delivered","to":"A","handle":188}
+{"ev":"sent","to":"A","handle":189}
+{"ev":"rx","from":"A","text":"auto A#1034","seq":1338441882,"rssi":-81}
+{"ev":"delivered","to":"A","handle":189}
+{"ev":"sent","to":"A","handle":190}
+{"ev":"delivered","to":"A","handle":190}
+{"ev":"rx","from":"A","text":"auto A#1035","seq":1338441883,"rssi":-84}
+{"ev":"sent","to":"A","handle":191}
+{"ev":"rx","from":"A","text":"auto A#1036","seq":1338441884,"rssi":-80}
+{"ev":"delivered","to":"A","handle":191}
+{"ev":"sent","to":"A","handle":192}
+{"ev":"rx","from":"A","text":"auto A#1037","seq":1338441885,"rssi":-81}
+{"ev":"delivered","to":"A","handle":192}
+{"ev":"sent","to":"A","handle":193}
+{"ev":"delivered","to":"A","handle":193}
+{"ev":"rx","from":"A","text":"auto A#1038","seq":1338441886,"rssi":-82}
+{"ev":"sent","to":"A","handle":194}
+{"ev":"rx","from":"A","text":"auto A#1039","seq":1338441887,"rssi":-82}
+{"ev":"sent","to":"A","handle":195}
+{"ev":"rx","from":"A","text":"auto A#1040","seq":1338441888,"rssi":-82}
+{"ev":"delivered","to":"A","handle":195}
+{"ev":"delivered","to":"A","handle":194}
+{"ev":"sent","to":"A","handle":196}
+{"ev":"rx","from":"A","text":"auto A#1041","seq":1338441889,"rssi":-79}
+{"ev":"delivered","to":"A","handle":196}
