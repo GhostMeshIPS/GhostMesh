@@ -6,8 +6,8 @@ One build per board, because each board's secret keys are compiled in.
 | Board | Build | Runs | Where it lives |
 |---|---|---|---|
 | A, B, C, D | `pio run -e A` … `-e D` | node: routing + crypto, relays, delivers, OLED | power bank / wall charger (or the laptop for debugging) |
-| W | `pio run -e W` | watchtower: mesh clock, signed TIME beacons, IPS log, BLOCK | plugged into the laptop |
-| X | `pio run -e X` | attacker passthrough (decision 18): sniffs and prints frames, sends frames the laptop gives it, sets its MAC. **No keys, never transmits on its own**; attacks run in `security/attacks/` | the attack laptop, only during attack segments |
+| W | `pio run -e W` (ESP32-WROOM-32E, serial 921600) | watchtower: mesh clock, signed TIME beacons, IPS log, BLOCK | plugged into the laptop |
+| X | `pio run -e X` (ESP32-WROOM-32E, serial 921600) | attacker passthrough (decision 18): sniffs and prints frames, sends frames the laptop gives it, sets its MAC. **No keys, never transmits on its own**; attacks run in `security/attacks/` | the attack laptop, only during attack segments |
 
 ```
 firmware/

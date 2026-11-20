@@ -152,7 +152,7 @@ def send(port, obj, state=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", required=True)
-    ap.add_argument("--baud", type=int, default=115200)
+    ap.add_argument("--baud", type=int, default=921600)   # W is a WROOM-32E (UART bridge); S3 nodes ignore it
     ap.add_argument("--sync", action="store_true", help="set the clock from this laptop at start")
     ap.add_argument("--log", help="append every JSON line to this file (JSON lines)")
     args = ap.parse_args()

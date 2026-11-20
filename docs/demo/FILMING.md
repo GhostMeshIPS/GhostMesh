@@ -27,8 +27,14 @@ pio run -e X -t upload --upload-port COMx      # attacker passthrough: no keys i
 cd ..
 ```
 
-Good flash: `Hash of data verified` → `Hard resetting`. Stuck at `Connecting...`: hold BOOT, tap RST,
-release BOOT, upload again.
+Good flash: `Hash of data verified` → `Hard resetting`. Stuck at `Connecting...`: hold BOOT, tap RST
+(EN on the WROOM boards), release BOOT, upload again.
+
+**W and X are ESP32-WROOM-32E boards**, A–D are S3 Super Minis; `platformio.ini` picks the right chip
+per board. The WROOMs talk through a USB-serial chip, so their speed is real: **921600**. `live.py`,
+`chat_client.py` and the attack scripts already use it. If a WROOM's port doesn't show up in
+`pio device list`, install the CP210x (or CH340) driver. To watch W or X raw:
+`pio device monitor -p COMx -b 921600`.
 
 Each node once, plugged in, so B/C/D stay quiet (it's saved in flash):
 
@@ -139,7 +145,9 @@ To retake: wait for the block to expire (or **Unblock** on the dashboard), then 
 | `xctl.py clock` hangs | X can't hear W's beacons: move X closer to W |
 | No BLOCK on the dashboard | Waited less than 2 min before attacking, or Auto-block is off (then click **Confirm BLOCK**) |
 | BLOCK on dashboard but no `block_sent` | Read the `[watchtower] error reason=...` line just above |
-| Opening a port reset W | `live.py` re-sends the clock by itself; wait for `clock_set` again |
+| Opening a port reset W | Normal on the WROOM (the USB chip pulses reset): `live.py` re-sends the clock by itself, wait for `clock_set` |
+| W or X prints garbage | Wrong speed: everything for W and X is 921600 |
+| IPS lags during the flood | W's serial carries ~140 lines/s at 921600, right at its limit until the BLOCK stops the relays. Use `--secs 30`, or `flood slow` (15/s) if it lags badly |
 
 **Don't film replay or spoof yet.** A replayed frame carries the victim's pseudonym, so the IPS can block
 the real node (fix pending in `ips/live.py`: block only the pseudonym+MAC pair when `id_ok` is false).

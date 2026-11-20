@@ -2,6 +2,10 @@
 // The protocol logic is NOT here: it's in node/gm_node.c (+ routing/ and crypto/), which is portable.
 #pragma once
 
+#ifndef GM_SERIAL_BAUD
+#define GM_SERIAL_BAUD 115200   // S3 native USB ignores it; WROOM boards set 921600 in platformio.ini
+#endif
+
 #include <Arduino.h>
 
 extern "C" {

@@ -146,7 +146,7 @@ static void proc_task(void *)
 void setup()
 {
     Serial.setTxBufferSize(4096);                       // W prints a log line for every frame it hears
-    Serial.begin(115200);
+    Serial.begin(GM_SERIAL_BAUD);   // 921600 on the WROOM (UART bridge); ignored on native USB
     delay(300);
     led_init();
     s_prefs.begin("ghostmesh", false);

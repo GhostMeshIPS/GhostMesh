@@ -9,9 +9,14 @@
 static volatile uint32_t s_off_at;
 static volatile bool s_on;
 
+#ifdef GM_LED_PLAIN
+// WROOM dev boards: one plain LED, no colours. Any indication lights it.
+static void set_rgb(uint8_t r, uint8_t g, uint8_t b) { digitalWrite(GM_LED_PIN, (r | g | b) ? HIGH : LOW); }
+void led_init() { pinMode(GM_LED_PIN, OUTPUT); set_rgb(0, 0, 0); }
+#else
 static void set_rgb(uint8_t r, uint8_t g, uint8_t b) { rgbLedWrite(GM_LED_PIN, r, g, b); }
-
 void led_init() { set_rgb(0, 0, 0); }
+#endif
 
 void led_indicate(int what)
 {
