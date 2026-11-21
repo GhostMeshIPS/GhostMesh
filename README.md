@@ -115,12 +115,12 @@ python tools/chat_client.py --port /dev/ttyUSB0   # TBD
 
 | Metric | Target | Actual |
 |---|---|---|
-| Delivery rate, A → C via B (50 msgs) | ≥ 95% | _TBD_ |
-| Reroute time after relay unplugged | ≤ 10 s | _TBD_ |
-| Replay rejection | 100% | _TBD_ |
-| Encrypt + decrypt time on ESP32-S3 | < 5 ms | _TBD_ |
-| Detection time per attack (ML) | ≤ 5 s | _TBD_ |
-| IPS recall / FPR (ML vs. rules) | ML ≥ rules | _TBD_ |
+| Delivery rate, A → C via B (50 msgs) | ≥ 95% | **94%** (47/50), Nov 20, A → C relayed by B/D through a wall (RSSI gate −85 dBm on A and C). Counted from ACKs back at A, so a lower bound: just short of the target. [Details](docs/results/hardware-measurements-2026-11-20.md) |
+| Reroute time after relay unplugged | ≤ 10 s | **Median 0.97 s, max 4.28 s**, 0 messages lost, 5 trials (§13 asks for 10). Met. [Details](docs/results/hardware-measurements-2026-11-20.md) |
+| Replay rejection | 100% | **Not tested on hardware yet** (needs X's `replay` session). Laptop tests: duplicate, 10 s stale and 90 s replayed frames all dropped and not relayed (`firmware/test/test_routing.c`) |
+| Encrypt + decrypt time on ESP32-S3 | < 5 ms | **12.7 ms**: encrypt 3.2 ms + trial-decrypt 9.5 ms (1000 runs on A). Missed. Trial-decrypt is ~3× a frame's 3.2 ms airtime, so CPU limits a board before airtime does, at ~100 frames/s. [Details](docs/results/hardware-measurements-2026-11-20.md) |
+| Detection time per attack (ML) | ≤ 5 s | **Not measured on hardware yet** (needs X). Design: 2 s to decide + up to 3 s for W to send the BLOCK. Laptop run of the demo flood (real node + watchtower code, `test_node.c` Demo 2, fed to `ips/live.py`): BLOCK after ~2 s |
+| IPS recall / FPR (ML vs. rules) | ML ≥ rules | **Met on synthetic attacks:** Random Forest 99% recall / 0.0% FPR vs. rules 37% / 8.9% (Isolation Forest 62% / 0.9%). Real hardware, no attacks: 0 false alarms in 654 windows (Nov 18) and 1,231 (Nov 17). Real attack recall still to come from X. [IPS results](ips/README.md#results) |
 | Sim: transmissions per delivered msg, flooding vs. route learning (50 nodes) | Route learning lower | Lower, but not deployed: 88.9 → 79.1 with random pairs (−11%), 90.7 → 64.9 with 5 conversations (−28%). See [sim results §7](docs/results/sim-results.md) |
 
 ## Known limitations
