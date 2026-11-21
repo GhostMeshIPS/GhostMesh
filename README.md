@@ -49,14 +49,14 @@ All boards run the same firmware; the role (`NODE`, `WATCHTOWER`, `ATTACKER`) is
 | Layer | Tech |
 |---|---|
 | Radio | ESP-NOW (connectionless Wi-Fi frames, 250-byte max payload) |
-| Firmware | C/C++ on ESP32-S3, FreeRTOS tasks _(Arduino-ESP32 vs. ESP-IDF: TBD)_ |
-| Crypto | X25519 + XChaCha20-Poly1305, Ed25519-signed BLOCKs _(Monocypher or libsodium: TBD)_ |
+| Firmware | C/C++ on ESP32-S3, FreeRTOS tasks (Arduino-ESP32 via PlatformIO; W and X on ESP32-WROOM-32E) |
+| Crypto | X25519 + XChaCha20-Poly1305, Ed25519-signed BLOCKs (Monocypher 4.0.2) |
 | Routing | Managed flooding |
 | Simulation | Python discrete-event sim running the real `routing.c` (via `ctypes`), 20–50 nodes |
 | IPS | Python: Isolation Forest + Random Forest, rule-based baseline, Streamlit dashboard |
 | Analysis | `.pcap` export + Wireshark Lua dissector |
 
-Full protocol spec (frame format, forwarding rules, serial schema): **[PROTOCOL.md](PROTOCOL.md)** _(TBD)_
+Full protocol spec (frame format, forwarding rules, serial schema): **[PROTOCOL.md](PROTOCOL.md)**
 
 ## Repository layout
 
@@ -77,7 +77,7 @@ ghostmesh/
 
 ## Getting started
 
-> _TBD: filled in once the toolchain is locked on Monday._
+> 4× ESP32-S3 Super Mini (A–D), 2× ESP32-WROOM-32E (W, X), USB-C data cables, PlatformIO. Details: [firmware/README.md](firmware/README.md).
 
 ### Hardware
 
@@ -102,7 +102,7 @@ pio run -e W -t upload --upload-port COM13         # watchtower (ESP32-WROOM-32E
 
 ```bash
 pip install -r requirements.txt
-python tools/chat_client.py --port /dev/ttyUSB0   # TBD
+python tools/chat_client.py --port /dev/ttyUSB0   # one per board (A and C)
 ```
 
 ### Run the IPS dashboard
@@ -190,4 +190,4 @@ _Add the rest of the wanted screenshots here._
 
 ## License
 
-_TBD (MIT suggested)._
+MIT.
