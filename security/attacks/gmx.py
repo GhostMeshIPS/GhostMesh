@@ -22,6 +22,7 @@ import os
 import queue
 import re
 import struct
+import sys
 import threading
 import time
 from contextlib import contextmanager
@@ -287,6 +288,13 @@ class XRadio(_RadioBase):
         self._stop = threading.Event()
         self._t = threading.Thread(target=self._reader, daemon=True)
         self._t.start()
+        # X keeps a half-received line between sessions (bytes from an earlier program or from the port
+        # opening, with no newline yet). The first real command would be glued onto it and rejected
+        # (line_too_long / bad_json). A bare newline ends that leftover line; drop whatever X says about it.
+        with self._wlock:
+            self.ser.write(b"\n")
+        time.sleep(0.3)
+        self._drain_events()
 
     def _reader(self):
         while not self._stop.is_set():
@@ -321,6 +329,17 @@ class XRadio(_RadioBase):
         with self._wlock:
             self.ser.write(line.encode())
 
+    def _drain_events(self):
+        while True:
+            try:
+                self.events.get_nowait()
+            except queue.Empty:
+                return
+
+    # Errors that mean the command being waited on failed. Anything else (a corrupted tx line during a
+    # flood, a leftover partial line) is about an earlier line: count it and keep waiting.
+    FATAL_ERRORS = {"bad_mac", "multicast_mac", "espnow_init_failed"}
+
     def _wait_event(self, name, timeout):
         end = time.time() + timeout
         while time.time() < end:
@@ -331,7 +350,11 @@ class XRadio(_RadioBase):
             if ev.get("ev") == name:
                 return ev
             if ev.get("ev") == "error":
-                raise RuntimeError(f"X reported an error: {ev}")
+                if ev.get("reason") in self.FATAL_ERRORS:
+                    raise RuntimeError(f"X reported an error: {ev}")
+                self.x_errors = getattr(self, "x_errors", 0) + 1
+                print(f"[gmx] X reported {ev.get('reason')} for an earlier line (ignored, "
+                      f"{self.x_errors} so far)", file=sys.stderr, flush=True)
         raise TimeoutError(f"no '{name}' event from X within {timeout} s")
 
     def send(self, frame):

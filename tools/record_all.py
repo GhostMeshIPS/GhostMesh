@@ -327,6 +327,8 @@ def bench(a, report):
 def write_report(report):
     RESULTS.mkdir(parents=True, exist_ok=True)
     path = RESULTS / f"hardware-measurements-{date.today().isoformat()}.md"
+    if path.exists():                       # a second run the same day must not wipe the first run's numbers
+        path = path.with_name(f"{path.stem}-{time.strftime('%H%M')}.md")
     L = [f"# Hardware measurements, {date.today().isoformat()}", "",
          "Made with `tools/record_all.py`. Boards: A-D ESP32-S3 Super Mini, W and X ESP32-WROOM-32E.", ""]
     rr = [r for r in report.get("reroute", []) if r["reroute_s"] is not None]
