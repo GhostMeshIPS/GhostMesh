@@ -123,6 +123,14 @@ python tools/chat_client.py --port /dev/ttyUSB0   # TBD
 | IPS recall / FPR (ML vs. rules) | ML ≥ rules | **Met on synthetic attacks:** Random Forest 99% recall / 0.0% FPR vs. rules 37% / 8.9% (Isolation Forest 62% / 0.9%). Real hardware, no attacks: 0 false alarms in 654 windows (Nov 18) and 1,231 (Nov 17). Real attack recall still to come from X. [IPS results](ips/README.md#results) |
 | Sim: transmissions per delivered msg, flooding vs. route learning (50 nodes) | Route learning lower | Lower, but not deployed: 88.9 → 79.1 with random pairs (−11%), 90.7 → 64.9 with 5 conversations (−28%). See [sim results §7](docs/results/sim-results.md) |
 
+## Screenshots
+
+**Simulation: one message crossing a 50-node mesh.** A replay of a real `scaling` run through the actual `routing.c`, 310 ms in, as C receives the message. Blue nodes relayed it, grey nodes stayed quiet after hearing k = 2 copies, orange nodes are still waiting out their jitter.
+
+![50-node simulation: one message crossing the mesh](docs/results/screenshots/sim_50node_flood.png)
+
+_Add the rest of the wanted screenshots here._
+
 ## Known limitations
 
 - **Range is tabletop-scale.** ESP-NOW reaches many meters, so on one table every board hears every other one, even at minimum TX power. For the demo, multi-hop is forced physically: metal / aluminum shielding between the boards makes sure A and C really can't hear each other, and MAC rotation stays on the whole time. We decided against a MAC allowlist since it would be a security risk.
@@ -139,6 +147,12 @@ python tools/chat_client.py --port /dev/ttyUSB0   # TBD
 - Phone app over BLE
 - Federated IPS where multiple watchtowers vote before blocking
 - Cover traffic to resist timing analysis
+
+## Notes for the team (temporary)
+
+_Working notes until the repo is cleaned up after the demo video. Agents: read these before collecting screenshots._
+
+- **Screenshots to take (Network #1):** the receive and send flowcharts in [PROTOCOL.md §5.1](PROTOCOL.md#51-receive-rules) and [§5.2](PROTOCOL.md#52-send-rules). They render as diagrams on GitHub; screenshot both there for the screenshots set.
 
 ## Team
 
