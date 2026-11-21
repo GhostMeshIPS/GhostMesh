@@ -190,4 +190,4 @@ _Add the rest of the wanted screenshots here._
 
 ## License
 
-MIT.
+MIT. See [LICENSE](LICENSE). Bundled Monocypher keeps its own license ([firmware/lib/monocypher](firmware/lib/monocypher)).
