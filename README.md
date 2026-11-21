@@ -4,20 +4,22 @@
 
 > Meshtastic leaks who's talking. We built a mesh protocol that doesn't, and an AI watchtower that catches and blocks attackers inside the network.
 
-Built for **Patriot HackFest 2026**: *bypass surveillance, build survival tools, design tomorrow's underground tech.*
+Built for **Patriot HackFest Fall 2026**, track **"Life underground"**, problem **#7**: *the Directorate controls the network and can shut it down whenever it wants. How would people organize, share information or call for help without it?*
 
-> 🚧 **Status:** In development (hackathon week). Sections marked _TBD_ get filled in as features land.
+> **Status:** Submitted. Demo video: [`docs/results/videos/final/GhostMesh_FULL.mp4`](docs/results/videos/final/GhostMesh_FULL.mp4).
 
 ---
 
 ## The problem
 
-When the internet is shut down or watched, cell towers and routers are choke points: they can be switched off, and they log who talks to whom. Existing off-grid meshes like Meshtastic keep working without towers, but they send a cleartext routing header that still reveals who is talking.
+In 2087 the surface is unlivable, and two billion people live in the Hollow, cities carved into old mines and subway tunnels. The Directorate controls the air, movement between levels and the network, and it can cut the network off whenever it wants. Every tower and router it runs is a choke point: it can be switched off, and it logs who talks to whom.
+
+Off-grid meshes like Meshtastic keep working without towers, but their cleartext routing headers still show who is talking to whom, which is exactly what a watching Directorate needs. GhostMesh is the resistance's answer to problem #7: a network the Directorate can't switch off, can't read, and can't map, that also notices and ejects intruders. Because it carries any short message, it also helps with blackout warnings (#1), finding family across levels (#8) and sharing outbreak data the official numbers hide (#9).
 
 ## What GhostMesh does
 
 - **Multi-hop messaging with no infrastructure.** Cheap ESP32-S3 boards relay end-to-end encrypted text over ESP-NOW. If A can't reach C, B forwards it.
-- **Self-healing routing.** Nodes learn routes from traffic and HELLO beacons. Unplug a relay and traffic reroutes through another node within seconds.
+- **Self-healing by design.** Managed flooding sends every message over every path, so there are no routes to repair: unplug a relay and the next message goes around it (measured on hardware: median 0.97 s, 0 messages lost).
 - **Metadata privacy.** The destination never appears in cleartext, sender pseudonyms and Wi-Fi MACs rotate every epoch, and every frame is a fixed 240 bytes.
 - **Replay and outsider protection.** A network-key link tag drops outsider frames at the first hop; sequence numbers and timestamps inside the ciphertext stop replays.
 - **AI intrusion prevention.** A watchtower node streams traffic metadata to an ML-based IPS that detects spoofing, flooding, replay, and routing abuse, then broadcasts a signed BLOCK so the mesh ejects the attacker.
