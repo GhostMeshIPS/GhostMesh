@@ -141,7 +141,7 @@ _Add the rest of the wanted screenshots here._
 
 ## Known limitations
 
-- **Range is tabletop-scale.** ESP-NOW reaches many meters, so on one table every board hears every other one, even at minimum TX power. For the demo, multi-hop is forced physically: metal / aluminum shielding between the boards makes sure A and C really can't hear each other, and MAC rotation stays on the whole time. We decided against a MAC allowlist since it would be a security risk.
+- **Range is tabletop-scale.** ESP-NOW reaches many meters, so on one table every board hears every other one, even at minimum TX power. For the demo, multi-hop is forced with three rooms (A, then relays B and D, then C) plus an RSSI gate at −85 dBm on A and C, so A and C really can't hear each other; MAC rotation stays on the whole time. We decided against a MAC allowlist since it would be a security risk.
 - **Route learning isn't deployed.** The mesh uses managed flooding. We built a route-learning mode that limits each flood to how far away the recipient is, but any scoped TTL tells a sniffer roughly how far the recipient is, so we kept it off and only use it in the sim to measure what it would save (see [PROTOCOL.md §6](PROTOCOL.md)).
 - **MAC-rotating attackers** can try to dodge a block. Per-neighbor rate limits and the link-tag requirement limit this to insiders.
 - Keys are pre-provisioned for the demo; there's no in-field key exchange yet.

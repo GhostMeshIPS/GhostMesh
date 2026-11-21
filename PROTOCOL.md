@@ -234,18 +234,19 @@ Hop padding (§9.9) keeps `hop_count + ttl` the same on every frame. A scoped fr
 
 _Owner: Rashad (ACK contents: with Jose)_
 
-- ACK contents and how an ACK travels back
-- Retries and backoff
-- Duplicate delivery on retry
-- Delivery status reported to the chat client
+- **ACKs:** the recipient answers each delivered message with an ACK (sent as DATA, inner type ACK) whose body is the `msg_id` it answers. It waits a random 0–400 ms first, then the ACK floods back like any frame.
+- **Retries:** with no ACK, the sender resends with a new `msg_id`, the same `seq` and a new timestamp, after 1 s, 2 s and 4 s, and reports failed after a final 4 s wait (4 attempts).
+- **Duplicates:** the recipient remembers each sender's `seq` for 15 s. A repeat is ACKed again but not delivered twice.
+- **Status to the chat client:** sent, then delivered (✓✓) when the ACK arrives, or failed after the last retry.
 
 ## 8. Topology control
 
 _Owner: Rashad_
 
-- RSSI gate
-- TX power
-- Allowlist fallback and where it may be used
+- **TX power:** every board runs at minimum TX power (2 dBm).
+- **Rooms:** the demo spreads the boards over three rooms: A (and attacker X) in room 1, relays B and D in room 2, C (and watchtower W) in room 3.
+- **RSSI gate:** walls alone still let A hear C at about −86 dBm, so A and C drop frames weaker than −85 dBm. Through-wall A–C frames (−88 to −96 dBm) are dropped; the relay links (−76 to −82 dBm) are kept. Every A–C message then goes through B or D (`docs/results/hardware-measurements-2026-11-20.md`).
+- **No MAC allowlist:** dropped as a security risk, and it would conflict with MAC rotation.
 
 ## 9. Security
 
@@ -314,7 +315,7 @@ link_tag = BLAKE2b(key=network_key, digest_size=8, "GM-LINK" || frame[0:22] || f
 - Test vector: `network_key = 20 21 … 3f`, frame byte *i* = *i* → `152ee8ad612ca586`.
 - `flags`: bit 0 = SOS (left in cleartext so relays can prioritise it). All other bits are 0. ⚑ The §4.1
   "needs-ACK" flag is removed, because it would reveal DATA vs. ACK.
-- ⚑ Cleartext `ver_type` values: **DATA, HELLO, CTRL, KEYS** (numbers TBD with Rashad). ACKs are sent as
+- ⚑ Cleartext `ver_type` values: **DATA, HELLO, CTRL, KEYS** (DATA = 1, HELLO = 2, CTRL = 3, KEYS = 4). ACKs are sent as
   DATA, and BLOCK is now a CTRL subtype.
 
 ### 9.5 Inner header (inside the 170-byte ciphertext)
@@ -529,19 +530,19 @@ _Owner: Rashad + Jose_
 
 | Parameter | Value | Notes |
 |---|---|---|
-| Default TTL (hardware) | TBD | |
+| Default TTL (hardware) | 5 (the sim uses 16 for 50-node meshes) | |
 | Default TTL (sim) | 16 | From the sim's `ttl_sweep` (commit `72c8408`): 50-node meshes need 14–16 to reach almost everyone, 20 nodes are already saturated at 12. Includes the +2 for hop padding. See `docs/results/sim-results.md` |
-| Seen-cache size | TBD | |
-| Seen-cache expiry | TBD | |
-| Relay jitter window | TBD | Planned 10–50 ms. Must be at least 2–3× the airtime of k frames |
+| Seen-cache size | 128 entries | |
+| Seen-cache expiry | 60 s | |
+| Relay jitter window | 10–50 ms, 50% random | Planned 10–50 ms. Must be at least 2–3× the airtime of k frames |
 | Suppression threshold k | 2 | From the sim's `k_sweep` (50 nodes, 300 and 1000 kbps, commit `72c8408`): k = 1 loses messages to coverage holes; k = 3 cuts tail latency but costs more transmissions and collisions. See `docs/results/sim-results.md` |
-| Frame airtime | TBD | Estimated ~3 ms per 240-byte frame at 1 Mbps; measure on hardware later |
+| Frame airtime | 2.46 ms per 240-byte frame at 1 Mbps (measured) | Estimated ~3 ms per 240-byte frame at 1 Mbps; measure on hardware later |
 | Route learning (v2) | Off | `route_learning`. Not for deployment: scoping leaks recipient distance (§6). Sim only, to measure the tradeoff |
 | Scope margin | 1 hop | Added to the learned distance (§6.3) |
 | Route expiry | 30 s | Learned distance forgotten if not confirmed (§6.2) |
 | HELLO interval | Off | Optional (§6.5). Neighbors are learned from traffic anyway; HELLO costs airtime |
 | Neighbor expiry | 6 s | §6.5 |
-| ACK timeout / retries / backoff | TBD | |
+| ACK timeout / retries / backoff | ACK after 0–400 ms; retries after 1 s, 2 s, 4 s; failed after 4 attempts | |
 | Epoch length | 60 s | `floor(unix_s / 60) mod 65536` (§9.2) |
 | Jitter random share | 50% | From the sim's `jitter_sweep` (50 nodes, 1000 kbps, commit `71f7fd0`): fewest collisions of 12 / 25 / 50% with the same delivery, at a small cost in median latency. The 20 ms random part is still 2–3 frame airtimes at 300 kbps (§5.3 timing rule) |
 | Accepted epoch window | ±1 epoch | §9.2 |
