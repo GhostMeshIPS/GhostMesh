@@ -5,7 +5,7 @@
 
 Figure 1: keys, flows and CIA protections. Figure 2: the same testbed with weak points marked.
 Edit WEAK_RAW (below) and the text in base() when the threat model changes, then rerun.
-Sources: security/threat-model.md, docs/planning/project-breakdown.md section 4.7.
+Sources: security/threat-model.md, docs/decisions.md section 4.7.
 """
 import sys, pathlib
 from html import escape as esc
@@ -258,7 +258,7 @@ code {{ font-family: 'JetBrains Mono', Consolas, monospace; font-size: .88em; }}
 BODY = f"""<main>
 <header>
 <h1>GhostMesh security map</h1>
-<p>The testbed (A → B → C with D as backup relay, watchtower W with the IPS laptop, insider attacker X), drawn twice: first with the keys and protections, then with the weak points marked. Updated {UPDATED}. Sources: <code>security/threat-model.md</code> and the decision log in <code>docs/planning/project-breakdown.md</code> §4.7. Regenerate with <code>python docs/diagrams/make_diagrams.py</code>.</p>
+<p>The testbed (A → B → C with D as backup relay, watchtower W with the IPS laptop, insider attacker X), drawn twice: first with the keys and protections, then with the weak points marked. Updated {UPDATED}. Sources: <code>security/threat-model.md</code> and the decision log in <code>docs/decisions.md</code> §4.7. Regenerate with <code>python docs/diagrams/make_diagrams.py</code>.</p>
 </header>
 <figure>
 <div class="scroll">{svg1}</div>

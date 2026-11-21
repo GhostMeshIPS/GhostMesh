@@ -1,7 +1,7 @@
 # GhostMesh threat model
 
 Owner: Jose Perez (Network #2). Spec: [`PROTOCOL.md` §9](../PROTOCOL.md). Decisions and open items:
-[`project-breakdown.md` §4.7](../docs/planning/project-breakdown.md). Rationale: [`protocol-design-motivation.md`](protocol-design-motivation.md).
+[`decisions.md`](../docs/decisions.md). Rationale: [`protocol-design-motivation.md`](protocol-design-motivation.md).
 Decision numbers (1–16) and open items (O1–O29) refer to §4.7. Diagrams: [`docs/diagrams/`](../docs/diagrams/).
 
 ## 1. What we protect (assets)
@@ -192,4 +192,4 @@ The protocol is tested on the host now; the simulator and the ESP32 testbed supp
 |---|---|---|
 | O24 | Insider-reachable parsers (KEYS, CTRL, inner header) and KEYS flooding make one malformed frame a mesh-wide crash or exploit; the ESP-NOW receive callback is reachable by outsiders | Open |
 
-O1–O23 and O25–O29 are closed; each closing decision is in [`project-breakdown.md` §4.7](../docs/planning/project-breakdown.md).
+O1–O23 and O25–O29 are closed; each closing decision is in [`decisions.md`](../docs/decisions.md).

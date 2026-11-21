@@ -1,13 +1,13 @@
 # GhostMesh security design: why we built it this way
 
 Owner: Jose Perez (Network #2). This is the companion to
-[`project-breakdown.md` §4.7](../docs/planning/project-breakdown.md). That file says **what** we decided; this one
+[`decisions.md`](../docs/decisions.md). That file says **what** we decided; this one
 says **why**: which construction we picked, what else we considered, and which project
 needs made the choice the right one.
 
 ## The needs every decision is judged against
 
-These come from the goals and constraints in `docs/planning/project-breakdown.md`.
+These come from the goals and constraints in `docs/decisions.md`.
 
 | ID | Need | Source |
 |---|---|---|

@@ -1,7 +1,7 @@
 # GhostMesh Protocol
 
 > **Status:** Draft.
-> Section owners are listed under each heading. Background and rationale: [`docs/planning/project-breakdown.md`](docs/planning/project-breakdown.md).
+> Section owners are listed under each heading. Background and rationale: [`docs/decisions.md`](docs/decisions.md).
 
 ## 1. Overview
 
@@ -253,7 +253,7 @@ _Owner: Jose_
 
 > **Status:** decided by Network #2. Items marked ⚑ change the shared frame format or `ver_type` list and
 > need team sign-off. Rationale for every choice: [`security/protocol-design-motivation.md`](security/protocol-design-motivation.md);
-> decision log and open items: [`docs/planning/project-breakdown.md` §4.7](docs/planning/project-breakdown.md).
+> decision log and open items: [`docs/decisions.md` §4.7](docs/decisions.md).
 > **Byte order:** big-endian for every multi-byte field. **Hash:** keyed BLAKE2b (Monocypher /
 > Python `hashlib.blake2b`), with the output length set by `digest_size`, never by truncation.
 
@@ -586,4 +586,4 @@ _Owner: Rashad_
 
 ## 15. Decision log
 
-- See [`docs/planning/project-breakdown.md` §4.7](docs/planning/project-breakdown.md) until decisions move here
+- See [`docs/decisions.md` §4.7](docs/decisions.md) until decisions move here

@@ -25,7 +25,7 @@ The capture header is watchtower metadata, NOT something a sniffer would see on 
     14     2     reserved (0)
 
 Packet timestamps are the mesh clock `t` (the same Unix clock as the IPS and the labels files).
-Decision: project-breakdown.md §4.7 (pcap exporter). Dissector: security/ghostmesh.lua.
+Decision: decisions.md (pcap exporter). Dissector: security/ghostmesh.lua.
 """
 import argparse
 import json

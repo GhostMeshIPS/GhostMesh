@@ -26,7 +26,7 @@ FIELD_TYPES = {
     "ttl": int, "hop": int, "rssi": int, "len": int, "link_ok": bool,
 }
 
-# Cleartext frame types, decided Nov 17 (routing.h RT_FRAME_*, project-breakdown 4.1 / 4.7 #8d).
+# Cleartext frame types, decided Nov 17 (routing.h RT_FRAME_*, decisions.md #8d).
 # An unknown type makes parse_line drop the packet.
 #   DATA   messages AND their ACKs (the real DATA/ACK type is hidden inside the encryption)
 #   HELLO  one-hop "I'm here" beacon

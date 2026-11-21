@@ -1,6 +1,6 @@
 # Monocypher 4.0.2 (vendored)
 
-Crypto library for GhostMesh (decision 13 in `docs/planning/project-breakdown.md` §4.7). Unmodified upstream files.
+Crypto library for GhostMesh (decision 13 in `docs/decisions.md` §4.7). Unmodified upstream files.
 Licence: dual 2-clause BSD / CC0 public domain, see `LICENCE.md`.
 
 | File | Provides |

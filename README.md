@@ -156,11 +156,6 @@ _Add the rest of the wanted screenshots here._
 - Federated IPS where multiple watchtowers vote before blocking
 - Cover traffic to resist timing analysis
 
-## Notes for the team (temporary)
-
-_Working notes until the repo is cleaned up after the demo video. Agents: read these before collecting screenshots._
-
-- **Screenshots to take (Network #1):** the receive and send flowcharts in [PROTOCOL.md §5.1](PROTOCOL.md#51-receive-rules) and [§5.2](PROTOCOL.md#52-send-rules). They render as diagrams on GitHub; screenshot both there for the screenshots set.
 
 ## Team
 
