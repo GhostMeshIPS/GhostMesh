@@ -110,7 +110,8 @@ python tools/chat_client.py --port /dev/ttyUSB0   # TBD
 ### Run the simulator
 
 ```bash
-# TBD
+python3 sim/run.py scaling      # experiments: see python3 sim/config.py
+python3 sim/analyze.py scaling  # table + plots in sim/out/figures/
 ```
 
 ## Results
