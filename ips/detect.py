@@ -5,7 +5,7 @@ import pandas as pd
 from sklearn.ensemble import IsolationForest, RandomForestClassifier
 from sklearn.metrics import classification_report
 from features import build_features   # reuse the Step 3 feature builder
-from ingest import read_file          # reads logs through schema.py, so every field keeps its exact type
+from ingest import read_file, read_labeled   # reads logs through schema.py, so every field keeps its exact type
 
 # Baseline detector: fixed thresholds a human would write from the protocol spec.
 # Normal nodes send ~1 packet per window, the flood ~30, so 15 sits safely between.
@@ -42,6 +42,15 @@ REAL_NORMAL_LOGS = ["datasets/2026-11-18_normal_01.jsonl"]
 # Real hardware with harmless events but no attacks: test only, never trained on (datasets/README.md).
 # Nov 17 bench test: B unplugged, a block + unblock of C, a W outage, C moved to a weak link.
 REAL_EVENT_LOGS = ["datasets/2026-11-17_mixed_01.jsonl"]
+# Real attacks from X (Nov 20, decision 20), with .labels.jsonl ground truth. The Random Forest trains on
+# these PLUS the synthetic session: the synthetic data assumed W hears every frame, but at 73 frames/s it
+# misses some, so a relay's copy can look like the original. Only real data teaches that.
+REAL_TRAIN_LOGS = ["datasets/2026-11-20_flood_01.jsonl", "datasets/2026-11-20_flood_02.jsonl",
+                   "datasets/2026-11-20_routing_02.jsonl", "datasets/2026-11-20_spoof_01.jsonl",
+                   "datasets/2026-11-20_replay_01.jsonl", "datasets/2026-11-20_normal_01.jsonl",
+                   "datasets/2026-11-20_unplugB_01.jsonl"]
+# Held-out TEST set, never trained on (datasets/README.md): spoof, routing (TTL fixed), 90 s replay, slow flood.
+REAL_TEST_LOG = "datasets/2026-11-20_mixed_01.jsonl"
 
 
 def rule_detect(feats):
@@ -159,11 +168,18 @@ if __name__ == "__main__":
 
     # --- Step 9: Random Forest — train on one session, test on a DIFFERENT one ---
     train = build_features(read_file("train_session.jsonl"))
+    real_train_logs = [p for p in REAL_TRAIN_LOGS if os.path.exists(p)]
+    if real_train_logs:
+        real_train = pd.concat([build_features(read_labeled(p)) for p in real_train_logs], ignore_index=True)
+        print(f"\nRandom Forest trains on {len(train)} synthetic + {len(real_train)} real windows "
+              f"({len(real_train_logs)} Nov 20 recordings; attack windows: "
+              f"{real_train['label'].value_counts().drop('normal', errors='ignore').to_dict()})")
+        train = pd.concat([train, real_train], ignore_index=True)
     test = build_features(read_file("test_session.jsonl"))
     rf = train_rf(train)
     test["pred_rf"] = rf_detect(rf, test)
 
-    print("\n=== Random Forest: trained on train_session, tested on test_session ===")
+    print("\n=== Random Forest: tested on the synthetic test_session ===")
     # Precision/recall for EACH class, not just attack vs. normal
     print(classification_report(test["label"], test["pred_rf"], digits=3))
 
@@ -192,6 +208,24 @@ if __name__ == "__main__":
     print("\n=== Benchmark on test_session (low_slow, outsider + cycling floods, forged CTRL, routing abuse, 90 s replay, spoof, B unplugged) ===")
     for who, s in bench.items():
         print_scores(who[:8], s)
+
+    # --- The headline: REAL attacks from X, on a recording no model trained on ---
+    # This one goes to the dashboard (BENCH_PATH) when the file exists; otherwise the synthetic one does.
+    if os.path.exists(REAL_TEST_LOG):
+        real_test = build_features(read_labeled(REAL_TEST_LOG))
+        real_test["pred_rf"] = rf_detect(rf, real_test)
+        print(f"\n=== Random Forest on REAL attacks: {REAL_TEST_LOG} (held out, never trained on) ===")
+        print(classification_report(real_test["label"], real_test["pred_rf"], digits=3, zero_division=0))
+        print(pd.crosstab(real_test["label"], real_test["pred_rf"], rownames=["actual"], colnames=["rf said"]))
+        y_real = real_test["label"] != "normal"
+        bench = {
+            RULE_NAME: evaluate(y_real, rule_detect(real_test)),
+            "Isolation Forest": evaluate(y_real, iforest_detect(model, real_test)),
+            "Random Forest": evaluate(y_real, real_test["pred_rf"] != "normal"),
+        }
+        print("\n=== Benchmark on REAL X attacks (spoof, routing with TTL fixed, 90 s replay, slow flood) ===")
+        for who, s in bench.items():
+            print_scores(who[:8], s)
     with open(BENCH_PATH, "w") as f:
         json.dump(bench, f, indent=2)
     print(f"saved benchmark -> {BENCH_PATH}")

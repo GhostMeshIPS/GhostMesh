@@ -63,6 +63,25 @@ The attacks match Jose's attack scripts for X (`security/attacks/`, decision 20)
 
 ## Results
 
+**Real attacks from X** (Nov 20, A/B/C/D + W + X; held-out session `datasets/2026-11-20_mixed_01.jsonl`, never
+trained on: spoof, routing with TTL fixed, 90 s replay, slow flood):
+
+| Detector | Attacks caught (recall) | Alarms correct (precision) | False alarms (FPR) |
+|---|---|---|---|
+| Rule baseline (`pkts > 15 or HELLOs > 1`) | 0% | n/a | 6.8% |
+| Isolation Forest (unsupervised, trained on normal only) | 46% | 92% | 0.5% |
+| **Random Forest** (supervised, names the attack) | **100%** | **100%** | **0.0%** |
+
+- The Random Forest trains on the synthetic session **plus** the other Nov 20 recordings (flood, routing,
+  spoof, replay, normal, B unplugged). Synthetic-only training already caught 98% of the real attacks, but
+  falsely blocked node A twice: the synthetic data assumed W hears every frame, and the real W misses some.
+- **Live pipeline on every real recording:** every attack gets its BLOCK or ALERT, and honest nodes are never
+  blocked (0 actions on the 4 recordings without attacks). The MAC-copying spoof (only the signal strength
+  gives it away) is caught and alerted on, without blocking the real A.
+- **Time to act on hardware:** 1.2–2.0 s after X starts (14 attack runs), plus up to 3 s for W to send the BLOCK.
+- Robustness check: with X's signal made 35 dB weaker than in the recordings, 98% are still caught, so the
+  model hasn't just memorised where X stood.
+
 **Real hardware** (Nov 18 smoke test, A/B/C + W, 18 min, no attacks, `datasets/2026-11-18_normal_01.jsonl`):
 the Random Forest raised **0 false alarms in 654 windows**, and the live pipeline raised 0 alerts.
 **Real hardware with harmless events** (Nov 17 bench test: B unplugged, a block of C, a W outage, C moved;
@@ -81,7 +100,8 @@ The rule only sees packet rate: it misses the slow attacks, and it blames honest
 Rashad's simulator (2,641 normal windows): Random Forest 0% false alarms, Isolation Forest 10%.
 
 - **Time to block:** 2 s to decide, plus up to 3 s for W to send it (W sends at most one CTRL frame per 3 s).
-- ⚠️ The attacks are still **synthetic**. Real attack recordings from X are needed for a real "caught %".
+- Not recorded yet on hardware: the `extras` session (identity-cycling flood, forged CTRL, W outage). Those are
+  covered by the synthetic test only.
 
 ## Files
 

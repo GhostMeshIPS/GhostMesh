@@ -78,7 +78,7 @@ on "Unknown keyed radio": it changes identity every 5 frames, so there's nothing
 | Explanations are plain template sentences | Ollama isn't running. Harmless: detection and blocking don't use the LLM |
 | Dashboard empty or frozen | Refresh the browser tab; check Terminal 2 is still running |
 | An alert on a node that did nothing | Click **Unblock** / **Dismiss** on the dashboard; blocks expire after 60 s anyway |
-| Hardware fails completely | **Backup:** `python3 live.py --file test_session.jsonl --speed 1` (the dashboard shows it as a replay) |
+| Hardware fails completely | **Backup:** replay the real Nov 20 attack recording: `python3 live.py --file datasets/2026-11-20_mixed_01.jsonl --speed 2` (spoof, routing, replay, slow flood from the real X; the dashboard shows it as a replay). `test_session.jsonl` is the synthetic one |
 
 ## After
 

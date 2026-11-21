@@ -160,6 +160,8 @@ class LiveIPS:
         if wall_now - self.last_prune > PRUNE_EVERY_S:  # keep only the last 6 hours of windows
             prune_jsonl(WINDOWS_LOG, "wall", WINDOWS_MAX_AGE_S, now=wall_now)
             self.last_prune = wall_now
+        if not self.buffer:
+            return                            # no mesh packets yet (only W's beacons so far): nothing to judge
         feats = build_features(pd.DataFrame(self.buffer))
         rows = feats[feats["window"] == w]
         if rows.empty:

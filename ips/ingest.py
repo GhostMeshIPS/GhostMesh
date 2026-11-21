@@ -9,7 +9,7 @@ import time
 import pandas as pd
 from schema import encode_cmd, make_set_time_cmd, needs_clock, parse_event, parse_line
 
-BAUD = 921600   # watchtower serial speed
+BAUD = 921600   # watchtower serial speed: W is an ESP32-WROOM-32E with a USB-UART bridge, so it must match
 
 
 def read_file(path):
@@ -28,9 +28,11 @@ def read_labeled(path):
       * tagged with that node (normally "X") or "?",
       * id_ok False under ANY letter: X's replays and `pseudo` spoofs carry the copied node's
         pseudonym, so W tags them "A"/"B"/..., but from X's MAC, so id_ok is False.
+      * spoof rows only: frames under a node's letter whose signal is >= SPOOF_LABEL_DB away from that
+        node's usual level (median of its genuine frames in the minute before the attack). A `pseudo_mac`
+        spoof copies the victim's MAC too (id_ok True), so signal strength is the only thing that
+        tells X apart. Nov 20 spoof_01: real A at -62 dBm, X as A at -30 dBm.
     Everything else is "normal". No labels file = all normal. `variant` is kept for per-variant results.
-    Known gap: a `pseudo_mac` spoof copies the victim's MAC as well, so its frames look exactly like the
-    victim's in the log (id_ok True) and stay "normal" here; only the signal strength tells them apart.
     """
     import json
     import os
@@ -48,9 +50,23 @@ def read_labeled(path):
                 else:
                     who = True
                 in_time = df["t"].between(row["start"], row["end"])
+                if row["label"] == "spoof" and "node" in df and "rssi" in df:
+                    who |= _far_from_usual_signal(df, row["start"])
                 df.loc[who & in_time, "label"] = row["label"]
                 df.loc[who & in_time, "variant"] = row.get("variant", "")
     return df
+
+
+SPOOF_LABEL_DB = 10     # boards sit still: honest RSSI stays within a few dB of its median
+
+
+def _far_from_usual_signal(df, start, lookback_s=60):
+    """Frames whose RSSI is >= SPOOF_LABEL_DB from their node's median over the genuine (id_ok) frames
+    in the lookback_s before `start`. Nodes with no frames in that minute are left alone."""
+    genuine = df["id_ok"] != False if "id_ok" in df else True          # noqa: E712
+    before = df[genuine & df["t"].between(start - lookback_s, start)]
+    usual = before.groupby("node")["rssi"].median().drop(["W", "?"], errors="ignore")  # W's tag also covers
+    return (df["rssi"] - df["node"].map(usual)).abs() >= SPOOF_LABEL_DB   # relayed beacons; NaN -> False
 
 
 def replay(path, speed=1.0):
@@ -77,7 +93,7 @@ def replay(path, speed=1.0):
 
 
 def open_serial(port):
-    """Open the watchtower's USB serial port, e.g. /dev/cu.usbmodem1101 on a Mac.
+    """Open the watchtower's USB serial port, e.g. /dev/cu.usbserial-0001 on a Mac (WROOM board).
 
     DTR and RTS are set LOW before opening: toggling them is how the ESP32's USB port resets the
     board, and a reset wipes W's clock (PROTOCOL.md 10.1 D2). It can still reset on some drivers,
@@ -85,9 +101,12 @@ def open_serial(port):
     """
     import serial                                   # pyserial; imported here so replay works without it
     ser = serial.Serial()
-    ser.port, ser.baudrate, ser.timeout = port, BAUD, 1     # baud is ignored on the S3's native USB
+    ser.port, ser.baudrate, ser.timeout = port, BAUD, 1
     ser.dtr = False
     ser.rts = False
+    # Exclusive: on macOS/Linux two programs can otherwise open the same port at once and silently
+    # split W's lines between them (and each opening resets W). A second one now gets "busy" instead.
+    ser.exclusive = True
     ser.open()
     return ser
 

@@ -38,6 +38,10 @@ One JSON line per attack run, with times on the same Unix clock as the log:
 
 Load a labelled recording with `ingest.read_labeled("datasets/<name>.jsonl")`.
 
+**How `detect.py` uses them:** the Random Forest trains on the synthetic session plus every Nov 20 recording
+except `2026-11-20_mixed_01` (the held-out test set). Nov 17 and Nov 18 are false-alarm checks only (the
+Isolation Forest also learns "normal" from Nov 18).
+
 ## Recordings
 
 | File | Date | Boards | Length | Contents | Notes |
@@ -49,6 +53,6 @@ Load a labelled recording with `ingest.read_labeled("datasets/<name>.jsonl")`.
 | `2026-11-20_flood_01.jsonl` | Nov 20, 19:30–19:36 EST | W + B, C, D + X (A not heard) | ~6 min, 13.4k lines | Normal traffic, then flood/loud for 80 s. | Session stopped early (X serial error, fixed in `gmx.py`); the 80 s attack is labelled and good. Use `flood_02` for the full flood set |
 | `2026-11-20_flood_02.jsonl` | Nov 20, 19:45–19:51 EST | W + A, B, C, D + X | ~7 min, 17.5k lines | Flood: loud, slow, outsider, low_slow (48 s each) | `record_all --scale 0.4`. X at 73 frames/s in `loud`; `outsider` frames show as node `?`, `id_ok=false` |
 | `2026-11-20_routing_02.jsonl` | Nov 20, 19:53–19:57 EST | W + A, B, C, D + X | ~4 min, 4.0k lines | Routing: hop0, hop0_ttlfix (48 s each) | Forged hop counts from X, ~4 frames/s |
-| `2026-11-20_spoof_01.jsonl` | Nov 20, 19:58–20:02 EST | W + A, B, C, D + X | ~4 min, 5.4k lines | Spoof of A: pseudo, pseudo_mac (48 s each) | `pseudo`: `id_ok=false`. **`pseudo_mac`: `id_ok=true`**, only A's rate (≈3×) gives it away. **Label gap:** `read_labeled` only tags frames from `X`/`?`, so the `pseudo_mac` frames (they show as node A) come out `normal` (220 `spoof` rows, all from `pseudo`) |
+| `2026-11-20_spoof_01.jsonl` | Nov 20, 19:58–20:02 EST | W + A, B, C, D + X | ~4 min, 5.4k lines | Spoof of A: pseudo, pseudo_mac (48 s each) | `pseudo`: `id_ok=false`. **`pseudo_mac`: `id_ok=true`**, only A's rate (≈3×) and signal (X at −30 dBm vs. the real A at −62) give it away. `read_labeled` now labels both: `id_ok=false` frames, and in spoof rows frames ≥ 10 dB off the node's usual signal (219 + 190 frames) |
 | `2026-11-20_replay_01.jsonl` | Nov 20, 20:02–20:08 EST | W + A, B, C, D + X | ~6 min, 5.3k lines | Replay: age_30s, age_90s, age_240s (48 s each) | ~5 replayed frames/s, `id_ok=false` |
 | `2026-11-20_mixed_01.jsonl` | Nov 20, 20:11–20:18 EST | W + A, B, C, D + X | ~6 min, 9.4k lines | spoof/pseudo, routing/hop0_ttlfix, replay/age_90s, flood/slow | **Held-out TEST set: never train on it.** `extras` (cycling, CTRL forgery, W outage) was not recorded |
