@@ -129,6 +129,14 @@ python tools/chat_client.py --port /dev/ttyUSB0   # TBD
 
 ![50-node simulation: one message crossing the mesh](docs/results/screenshots/sim_50node_flood.png)
 
+**IPS: a replay attack caught live.** The watchtower dashboard on Nov 20 with the real boards: X replays captured frames (green bars), and the IPS blocks it 4 s later.
+
+![IPS dashboard: replay attack detected and blocked in 4 s](recordings/ips_recording/screenshots/05_ask_the_watchtower_chatbot.png)
+
+**IPS: rule vs. AI on real attacks.** The mesh map with the blocked attacker, and how each detector scored on the Nov 20 attacks from X: the simple rule caught 0%, the Isolation Forest 46%, the Random Forest 100%. The activity feed explains the block in plain English.
+
+![IPS dashboard: mesh map, rule vs. AI scores, and an explained block](recordings/ips_recording/screenshots/03_mesh_map_and_rule_vs_ai.png)
+
 _Add the rest of the wanted screenshots here._
 
 ## Known limitations
