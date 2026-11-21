@@ -152,6 +152,7 @@ class PacketClip(Scene):
                    (0.65, "#3c6bbb", "len"), (5.0, BLUE, "message (padded)"), (1.1, "#c98a12", "tag")])
         brace_ct = Brace(VGroup(*cip[1:8]), UP, buff=0.12, color=SUB)
         brace_tx = Text("encrypted (XChaCha20)", font_size=18, color=SUB).next_to(brace_ct, UP, buff=0.08)
+        self.cip = cip                                   # attack_clip.py zooms out from this bar
         self.play(FadeIn(cip), frame.animate.set_opacity(0), FadeIn(brace_ct), FadeIn(brace_tx), run_time=0.4)
         self.remove(frame)                                                                 # -> 17.8 s
 
