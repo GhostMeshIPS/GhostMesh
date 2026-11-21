@@ -91,7 +91,11 @@ ghostmesh/
 ### Flash the firmware
 
 ```bash
-# TBD
+python3 security/keygen.py --nodes A,B,C,D,W,X      # once: per-board keys (gitignored)
+cd firmware
+pio run -e A -t upload --upload-port COM8          # same for B, C, D
+pio run -e W -t upload --upload-port COM13         # watchtower (ESP32-WROOM-32E)
+# details: firmware/README.md
 ```
 
 ### Run the chat client
@@ -104,7 +108,10 @@ python tools/chat_client.py --port /dev/ttyUSB0   # TBD
 ### Run the IPS dashboard
 
 ```bash
-# TBD
+cd ips && pip install -r requirements-lock.txt
+streamlit run dashboard.py                         # http://localhost:8501
+python3 live.py --port <watchtower serial port>     # feed it live from W
+# details: ips/README.md
 ```
 
 ### Run the simulator
