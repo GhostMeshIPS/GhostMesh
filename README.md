@@ -137,6 +137,18 @@ python tools/chat_client.py --port /dev/ttyUSB0   # TBD
 
 ![IPS dashboard: mesh map, rule vs. AI scores, and an explained block](recordings/ips_recording/screenshots/03_mesh_map_and_rule_vs_ai.png)
 
+**Security map: keys, flows and protections.** Which keys each testbed board holds, what crosses each link, and how confidentiality, integrity and availability are kept. The interactive version, with a second view that marks the weak points, is [docs/diagrams/security-map.html](docs/diagrams/security-map.html).
+
+![Security map: keys, flows and protections on the testbed](docs/results/screenshots/security_map_keys_and_protections.png)
+
+**Anatomy of a 240-byte frame.** What every byte does, which part a sniffer can read, and what Meshtastic's 16-byte cleartext header leaks by comparison. Source: [docs/diagrams/packet-anatomy.svg](docs/diagrams/packet-anatomy.svg).
+
+![Anatomy of a GhostMesh frame, compared with Meshtastic's header](docs/results/screenshots/packet_anatomy.png)
+
+**Replay attack, dropped at the first hop.** A frame from the replay clip: X re-sends a real frame from A, and B drops it because its epoch is 4 minutes old, even though the link tag is valid.
+
+![Replay clip: B drops a 4-minute-old replayed frame](docs/results/screenshots/replay_dropped_at_first_hop.png)
+
 _Add the rest of the wanted screenshots here._
 
 ## Known limitations
