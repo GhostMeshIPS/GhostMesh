@@ -64,3 +64,34 @@ message still arrived, all of them through B or D. Margin is ~3 dB on the weakes
 | File | Date | Boards | Length | Contents | Notes |
 |---|---|---|---|---|---|
 | `2026-11-20_unplugB_01.jsonl` | 2026-11-20 | W + A, B, C, D | 5690 lines | Reroute trials: B unplugged and replugged, `mark` lines at each |  |
+
+## Attack recordings (evening, X on the mesh)
+
+Six sessions recorded with `tools/record_all.py --scale 0.4` (each attack 48 s, 24 s gaps, 2 min of normal
+traffic first). `extras` (cycling, CTRL forgery, W outage) was **skipped for time**. W stayed up through
+every session (no resets, no `clock_not_set`). Normal traffic between attacks: 13–15 frames/s at W.
+
+| Recording | Attack / variant | Frames/s at W | What W saw |
+|---|---|---|---|
+| `flood_01` | flood/loud (80 s) | 118 | X at **69 frames/s**; session then stopped (see note) |
+| `flood_02` | flood/loud | 123 | X at **73 frames/s** (target 80) |
+| | flood/slow | 60 | X at 15 frames/s |
+| | flood/outsider | 66 | 51 frames/s from an unknown node (`?`), all `id_ok=false` |
+| | flood/low_slow | 47 | X at 8 frames/s |
+| `routing_02` | routing/hop0 | 17 | X ~4 frames/s with forged hop counts |
+| | routing/hop0_ttlfix | 16 | same, TTL fixed up |
+| `spoof_01` | spoof/pseudo | 33 | X uses A's pseudonym with its own MAC: 219 frames `id_ok=false`; A's rate 4 → 13 frames/s |
+| | spoof/pseudo_mac | 30 | X copies A's pseudonym **and** MAC: `id_ok=true`, only A's rate gives it away (4 → 12 frames/s) |
+| `replay_01` | replay/age_30s, 90s, 240s | 18–19 | ~5 frames/s of old frames, `id_ok=false` (old epoch) |
+| `mixed_01` | spoof, routing, replay, flood (one each) | 18–73 | held-out test set |
+
+Notes:
+- **X's serial fix works:** X kept 73 frames/s from the laptop during the loud flood (80 asked). Before the
+  8 KB receive buffer it dropped and cut `tx` lines.
+- **`flood_01` stopped early.** After 80 s of the loud flood, X rejected a line (`line_too_long`) and the old
+  `gmx.py` treated that as fatal at the next MAC change. The 80 s it recorded are good and labelled.
+  `gmx.py` now clears X's leftover line on connect and only stops on real MAC errors. `flood_02` is the
+  full session. `routing_01` (9 s, aborted) is not committed.
+- **Spoof with a copied MAC passes the identity check.** In `pseudo_mac` every frame is `id_ok=true`, so
+  the IPS has to catch it from A's frame rate (≈3×) or two senders with one MAC, not from `id_ok`. Those frames show as node A, so `ingest.read_labeled` labels them `normal`
+  (it only tags `X` and `?` frames): Hannan should treat A's frames in that window as spoof, or skip them.
