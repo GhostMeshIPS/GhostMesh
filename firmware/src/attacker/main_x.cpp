@@ -22,13 +22,14 @@
 // SECURITY: the raw-transmit command exists ONLY in this build ([env:X]); node and watchtower builds
 // exclude src/attacker/ (platformio.ini). Never flash this onto a demo node.
 #include <ArduinoJson.h>
+#include <atomic>
 #include <esp_timer.h>
 
 #include "app.h"
 
 static QueueHandle_t s_rx_q;
-static volatile bool s_sniff = true;
-static volatile uint32_t s_rx = 0, s_tx = 0;
+static std::atomic<bool> s_sniff{true};
+static std::atomic<uint32_t> s_rx{0}, s_tx{0};   // s_tx: loop task, s_rx: processing task
 
 static const char HEX_DIGITS[] = "0123456789abcdef";
 
@@ -60,8 +61,8 @@ static void emit_status()
     snprintf(buf, sizeof buf,
              "{\"ev\":\"status\",\"name\":\"X\",\"tx\":%lu,\"tx_fail\":%lu,\"rx\":%lu,\"rx_overflow\":%lu,"
              "\"sniff\":%s,\"mac\":\"%s\",\"airtime_avg_us\":%lu,\"uptime_ms\":%lu}",
-             (unsigned long)s_tx, (unsigned long)radio_tx_failures(), (unsigned long)s_rx,
-             (unsigned long)radio_rx_overflows(), s_sniff ? "true" : "false", ms,
+             (unsigned long)s_tx.load(), (unsigned long)radio_tx_failures(), (unsigned long)s_rx.load(),
+             (unsigned long)radio_rx_overflows(), s_sniff.load() ? "true" : "false", ms,
              (unsigned long)radio_airtime_avg_us(), (unsigned long)millis());
     serial_emit(buf);
 }
@@ -133,6 +134,10 @@ static void proc_task(void *)
 void setup()
 {
     Serial.setTxBufferSize(8192);                       // one ~560-byte line per frame heard
+    // Receive side: a flood sends ~80 tx lines/s of ~500 bytes each. The default 256-byte UART buffer
+    // overflows while the sniffer task is printing, which cuts tx lines in half (bad_json / bad_hex) and
+    // silently drops attack frames. 8 KB holds ~16 queued tx lines (~200 ms at 80/s).
+    Serial.setRxBufferSize(8192);
     Serial.begin(GM_SERIAL_BAUD);   // 921600 on the WROOM (UART bridge); ignored on native USB
     delay(300);
     led_init();
